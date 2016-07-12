@@ -15,6 +15,8 @@ void setup(){
 void draw(){
   if(!humanPlayer) ;
   game.nextFrame();
+  background(#CCCCCC);
+  game.draw();
 }
 
 // key interaction

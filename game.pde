@@ -10,21 +10,46 @@ class FlappyBird {
 	PhysicsModel world;
 	ArrayList<Obstacle> obstacles = new ArrayList<Obstacle>();
 
-	int obstacleGap = 50;
+	int obstacleGap = 100;
   	int obstacleWidth = 10;
-  	int difficulty = 10;
+	int obstacleSpeed = 2;
+  	
+  	int difficulty = 60;
+  	int playerWidth = 10;
+  	int playerHeight = 10;
+
+  	PVector position, velocity, acceleration;
 
 	FlappyBird(PhysicsModel w){
 		world = w;
-		for(int i = 0; i < stageWidth % (obstacleGap + obstacleWidth); i++){
+		
+		position = new PVector(0, stageHeight/2);
+		velocity = new PVector(0,0);
+		acceleration = new PVector(0,0);
+
+		for(int i = 0; i < floor(stageWidth / (obstacleGap + obstacleWidth)); i++){
 			addObstacleAt(obstacleGap + (obstacleGap + obstacleWidth) * i);	
 		}
+
 	}
 
 	public void nextFrame(){
+		
 		// player
 		velocity.y += acceleration.y;
 		position.y += velocity.y;
+		
+		// obstacles
+		for (int i = 0; i < obstacles.size(); i++) {
+		  Obstacle o = obstacles.get(i);
+		  o.advance(obstacleSpeed);
+		}
+
+		Obstacle last = obstacles.get(obstacles.size()-1);
+
+		if(last.topLeft.x + obstacleWidth + obstacleGap <= stageWidth) addObstacleAt(stageWidth);
+
+		// collisions
 	}
 
 	public void takeAction(Action a){
@@ -39,14 +64,31 @@ class FlappyBird {
 	}
 
 	public State currentState(){
-	
+		return new State();
+	}
+
+	public void draw(){
+		noStroke();
+		fill(#CC0000);
+		rect(position.x, position.y-playerHeight/2, playerWidth, playerHeight);
+
+		fill(#00CC00);
+		stroke(#00AA00);
+		for (int i = 0; i < obstacles.size(); i++) {
+		  Obstacle o = obstacles.get(i);
+		  
+		  //upper
+		  rect(o.topLeft.x, 0, obstacleWidth, o.topLeft.y - o.gapHeight);
+		  //lower
+		  rect(o.topLeft.x, o.topLeft.y, obstacleWidth, stageHeight - o.topLeft.y);
+		}
 	}
 
 	// internal game methods
 
 	private void addObstacleAt(int x){
-		PVector gapCenter = new PVector(x, position.y);
-		int gapHeight = random(difficulty);
+		PVector gapCenter = new PVector(x, position.y + random(-difficulty/2, difficulty/2));
+		int gapHeight = difficulty + round(random(difficulty));
 
 		PVector topLeft = gapCenter.copy();
 		topLeft.y += gapHeight/2;
@@ -97,8 +139,6 @@ public class Obstacle{
 	float gapHeight;
 	float width;
 
-	int speed = 2;
-
 	Obstacle(PVector tl, float h, float w){
 		topLeft = tl;
 		gapHeight = h;
@@ -118,11 +158,11 @@ public class Obstacle{
 	}
 
 	public void advance(int x){
-		topLeft.x -= speed;
+		topLeft.x -= x;
 	}
 
 	public boolean passed(){
-		return ((tl.x - w) < 0);
+		return ((topLeft.x - width) < 0);
 	}
 }
 
