@@ -2,7 +2,7 @@ enum PhysicsModel{
 	MOVE, JUMP, HOVER
 }
 
-enum Actions{
+enum Action{
 	UP, DOWN
 }
 
@@ -11,16 +11,20 @@ class FlappyBird {
 	ArrayList<Obstacle> obstacles = new ArrayList<Obstacle>();
 
 	int obstacleGap = 50;
+  	int obstacleWidth = 10;
+  	int difficulty = 10;
 
 	FlappyBird(PhysicsModel w){
 		world = w;
-		for(int i = 0; i < stageWidth % Obstacle.width; i++){
-			
+		for(int i = 0; i < stageWidth % (obstacleGap + obstacleWidth); i++){
+			addObstacleAt(obstacleGap + (obstacleGap + obstacleWidth) * i);	
 		}
 	}
 
 	public void nextFrame(){
-
+		// player
+		velocity.y += acceleration.y;
+		position.y += velocity.y;
 	}
 
 	public void takeAction(Action a){
@@ -41,7 +45,14 @@ class FlappyBird {
 	// internal game methods
 
 	private void addObstacleAt(int x){
+		PVector gapCenter = new PVector(x, position.y);
+		int gapHeight = random(difficulty);
 
+		PVector topLeft = gapCenter.copy();
+		topLeft.y += gapHeight/2;
+
+		Obstacle o = new Obstacle(topLeft, gapHeight, obstacleWidth);
+		obstacles.add(o);
 	}
 
 	private void jump(){
@@ -81,8 +92,38 @@ class State{
 	}
 }
 
-class Obstacle{
-	static const width = 10;
+public class Obstacle{
+	PVector topLeft;
+	float gapHeight;
+	float width;
+
+	int speed = 2;
+
+	Obstacle(PVector tl, float h, float w){
+		topLeft = tl;
+		gapHeight = h;
+		width = w;
+	}
+
+	public float getX(){
+		return topLeft.x;
+	}
+
+	public float getGapTop(){
+		return topLeft.y + gapHeight;
+	}
+
+	public float getGapBottom(){
+		return topLeft.y;
+	}
+
+	public void advance(int x){
+		topLeft.x -= speed;
+	}
+
+	public boolean passed(){
+		return ((tl.x - w) < 0);
+	}
 }
 
 // game utilities 

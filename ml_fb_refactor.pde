@@ -21,8 +21,8 @@ void draw(){
 
 void keyReleased() {
   if(humanPlayer){
-    if(keyCode == UP) game.takeAction(Actions.UP);
-    if(keyCode == DOWN) game.takeAction(Actions.DOWN);
+    if(keyCode == UP) game.takeAction(Action.UP);
+    if(keyCode == DOWN) game.takeAction(Action.DOWN);
   }
 }
 
