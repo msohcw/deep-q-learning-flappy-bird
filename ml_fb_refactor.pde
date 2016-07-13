@@ -3,8 +3,8 @@ int playerWidth, playerHeight;
 FlappyBird game;
 Learner agent;
 
-boolean humanPlayer = true;
-int frameSpeed = 1;
+boolean humanPlayer = false;
+int frameSpeed = 50;
 
 int leftMargin, lineHeight, displayLines;
 
@@ -18,16 +18,17 @@ void setup(){
   displayLines = 0;
   
   game = new FlappyBird(PhysicsModel.JUMP);
+  agent = new Learner(0.0000001f, 0.01, 0.9);
 }
 
 void draw(){
   if(!humanPlayer){
+    agent.viewWorld(game.currentState());
     for(int i = 0; i< frameSpeed; i++){
-      agent.viewWorld();  // S
-      agent.act();        // A
-      agent.viewWorld();  // R, S
-      agent.learn();      // A
-      game.nextFrame();
+      game.takeAction(agent.act());
+      game.nextFrame();             
+      agent.viewWorld(game.currentState());
+      agent.learn(game.points);
     }
   }
   
@@ -44,6 +45,7 @@ void draw(){
   display("EPISODES", game.episodes + "");
   display("HIGH SCORE", game.highScore + "");
   display("FRAME SPEED", frameSpeed + "");
+  display("EPSILON", agent.epsilon + "");
 }
 
 void display(String title, String value){
