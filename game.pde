@@ -162,7 +162,7 @@ class FlappyBird {
 
 		// limit pipes to at least 20 on top / bottom
 		topLeft.y = min(topLeft.y, stageHeight - 20);
-		if(topLeft.y - gapHeight < 20) gapHeight -= 20 - (topLeft.y - gapHeight);
+		if(topLeft.y - gapHeight < 20) topLeft.y += 20 - (topLeft.y - gapHeight);
 
 		Obstacle o = new Obstacle(topLeft, gapHeight, obstacleWidth);
 		obstacles.add(o);

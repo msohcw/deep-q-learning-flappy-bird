@@ -5,11 +5,11 @@ FlappyBird game;
 boolean humanPlayer = true;
 
 void setup(){
-  size(300, 300);
+  size(300, 250);
   stageWidth = 200;
-  stageHeight = 300;
+  stageHeight = 250;
   
-  game = new FlappyBird(PhysicsModel.MOVE);
+  game = new FlappyBird(PhysicsModel.JUMP);
 }
 
 void draw(){
