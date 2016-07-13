@@ -14,9 +14,14 @@ class FlappyBird {
   	int obstacleWidth = 20;
 	int obstacleSpeed = 2;
   	
-  	int difficulty = 50;
+  	int difficulty = 60; // larger is easier
   	int playerWidth = 10;
   	int playerHeight = 10;
+
+  	int highScore = 0;
+
+  	int episodes = 0;
+  	int points = 0;
 
   	PVector position, velocity, acceleration;
 
@@ -37,7 +42,10 @@ class FlappyBird {
 		for (int i = 0; i < obstacles.size(); i++) {
 		  Obstacle o = obstacles.get(i);
 		  o.advance(obstacleSpeed);
-		  if(o.passed()) obstacles.remove(i);
+		  if(o.passed()){
+		  	obstacles.remove(i);
+		  	points++;
+		  }
 		}
 
 
@@ -77,31 +85,67 @@ class FlappyBird {
 		fill(#CC0000);
 		rect(position.x, position.y-playerHeight/2, playerWidth, playerHeight);
 
-		fill(#00CC00);
-		stroke(#00AA00);
 		for (int i = 0; i < obstacles.size(); i++) {
 		  Obstacle o = obstacles.get(i);
 		  
 		  //upper
+		  fill(#11AA11);
 		  rect(o.topLeft.x, 0, obstacleWidth, o.topLeft.y - o.gapHeight);
+		  
+		  fill(#1FAF1F);
+		  rect(o.topLeft.x + 1, 0, obstacleWidth - 2, o.topLeft.y - o.gapHeight);
+		  
+		  fill(#22BB22);
+		  rect(o.topLeft.x + 3, 0, obstacleWidth - 6, o.topLeft.y - o.gapHeight);
+
+		  fill(#00AA00);
+		  rect(o.topLeft.x, o.topLeft.y - o.gapHeight - 10, obstacleWidth, 10);
+		  
 		  //lower
-		  rect(o.topLeft.x, o.topLeft.y, obstacleWidth, stageHeight - o.topLeft.y);
+		  // rect(o.topLeft.x, o.topLeft.y, obstacleWidth, stageHeight - o.topLeft.y);
+
+		  fill(#11AA11);
+		  rect(o.topLeft.x, o.topLeft.y + 10, obstacleWidth, stageHeight - o.topLeft.y - 10);
+		  
+		  fill(#1FAF1F);
+		  rect(o.topLeft.x + 1, o.topLeft.y + 10, obstacleWidth - 2, stageHeight - o.topLeft.y - 10);
+		  
+		  fill(#22BB22);
+		  rect(o.topLeft.x + 3, o.topLeft.y + 10, obstacleWidth - 6, stageHeight - o.topLeft.y - 10);
+
+		  fill(#00AA00);
+		  rect(o.topLeft.x, o.topLeft.y, obstacleWidth, 10);
 		}
 
-		Obstacle first = obstacles.get(0);
-		stroke(#FF0000);	
-		rect(first.topLeft.x,first.topLeft.y,obstacleWidth,stageHeight-first.topLeft.y);
-		rect(first.topLeft.x,0,obstacleWidth,first.topLeft.y-first.gapHeight);
+		textAlign(CENTER,CENTER);
+		textSize(51);
+		fill(#AAAAAA);
+		text(points, stageWidth/2, stageHeight/2 + 1);
+		textSize(50);
+		fill(#EEEEEE);
+		text(points, stageWidth/2, stageHeight/2);
 	}
 
 	// internal game methods
 
 	private void reset(){
+		// clear old game objects
+		
 		obstacles.clear();
+
+		// reset game statistics
+
+		episodes++;
+		highScore = max(points,highScore);
+		points = 0;
+
+		// reset game physics
 
 		position = new PVector(0, stageHeight/2);
 		velocity = new PVector(0,0);
 		acceleration = new PVector(0,0);
+
+		// add new objects
 
 		for(int i = 0; i < floor(stageWidth / (obstacleGap + obstacleWidth)); i++){
 			addObstacleAt(obstacleGap + (obstacleGap + obstacleWidth) * i);	
@@ -109,11 +153,16 @@ class FlappyBird {
 	}
 
 	private void addObstacleAt(int x){
-		PVector gapCenter = new PVector(x, position.y + random(-difficulty/2, difficulty/2));
+		PVector gapCenter = new PVector(x, position.y + random(-difficulty, difficulty));
 		int gapHeight = difficulty + round(random(difficulty));
 
+		// topLeft is top left coordinate of lower pipe
 		PVector topLeft = gapCenter.copy();
 		topLeft.y += gapHeight/2;
+
+		// limit pipes to at least 20 on top / bottom
+		topLeft.y = min(topLeft.y, stageHeight - 20);
+		if(topLeft.y - gapHeight < 20) gapHeight -= 20 - (topLeft.y - gapHeight);
 
 		Obstacle o = new Obstacle(topLeft, gapHeight, obstacleWidth);
 		obstacles.add(o);
@@ -133,6 +182,8 @@ class FlappyBird {
 	private void jump(){
 		switch(world){
 			case MOVE:
+				position.y -= 10;
+				break;
 			case JUMP:
 				// if(velocity.y > 0) velocity.y -= 7;
 				velocity.y = -5; // flappy bird is not the real life
@@ -144,6 +195,8 @@ class FlappyBird {
 	private void fall(){
 		switch(world){
 			case MOVE:
+				position.y += 10;
+				break;
 			case JUMP:
 			case HOVER:
 		}

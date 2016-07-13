@@ -9,7 +9,7 @@ void setup(){
   stageWidth = 200;
   stageHeight = 300;
   
-  game = new FlappyBird(PhysicsModel.MOVE);
+  game = new FlappyBird(PhysicsModel.JUMP);
 }
 
 void draw(){
@@ -23,18 +23,14 @@ void draw(){
   fill(#EFEFEF);
   rect(stageWidth,0, 300 - stageWidth,stageHeight);
   
-  fill(#333333);
-  textSize(12);
+  fill(#111111);
+  textSize(10);
   textAlign(LEFT,CENTER);
   
-  int leftMargin = stageWidth + 5;
-  int lineHeight = 16;
+  int leftMargin = stageWidth + 10;
+  int lineHeight = 10;
   
-  text("EPISODES", leftMargin, lineHeight);
-  text(game.episodes, leftMargin, lineHeight * 2);
-
-  text("HIGHSCORE", leftMargin, lineHeight * 4);
-  text(game.highScore, leftMargin, lineHeight * 5);
+  text("EPISODES", leftMargin,lineHeight);
 }
 
 // key interaction
