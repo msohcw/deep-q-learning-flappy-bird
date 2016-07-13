@@ -1,6 +1,7 @@
 int stageWidth, stageHeight;
 int playerWidth, playerHeight;
 FlappyBird game;
+Learner agent;
 
 boolean humanPlayer = true;
 int frameSpeed = 1;
@@ -20,8 +21,17 @@ void setup(){
 }
 
 void draw(){
-  if(!humanPlayer) ;
-  for(int i = 0; i< frameSpeed; i++) game.nextFrame();
+  if(!humanPlayer){
+    for(int i = 0; i< frameSpeed; i++){
+      agent.viewWorld();  // S
+      agent.act();        // A
+      agent.viewWorld();  // R, S
+      agent.learn();      // A
+      game.nextFrame();
+    }
+  }
+  
+  // draw game graphics
   fill(#9ED1CE);
   rect(0,0,stageWidth,stageHeight);
   game.draw();
