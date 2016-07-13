@@ -3,18 +3,25 @@ int playerWidth, playerHeight;
 FlappyBird game;
 
 boolean humanPlayer = true;
+int frameSpeed = 1;
+
+int leftMargin, lineHeight, displayLines;
 
 void setup(){
   size(300, 250);
   stageWidth = 200;
   stageHeight = 250;
+
+  leftMargin = stageWidth + 10;
+  lineHeight = 12;
+  displayLines = 0;
   
   game = new FlappyBird(PhysicsModel.JUMP);
 }
 
 void draw(){
   if(!humanPlayer) ;
-  game.nextFrame();
+  for(int i = 0; i< frameSpeed; i++) game.nextFrame();
   fill(#9ED1CE);
   rect(0,0,stageWidth,stageHeight);
   game.draw();
@@ -23,18 +30,21 @@ void draw(){
   fill(#EFEFEF);
   rect(stageWidth,0, 300 - stageWidth,stageHeight);
   
-  fill(#333333);
-  textSize(12);
-  textAlign(LEFT,CENTER);
-  
-  int leftMargin = stageWidth + 5;
-  int lineHeight = 16;
-  
-  text("EPISODES", leftMargin, lineHeight);
-  text(game.episodes, leftMargin, lineHeight * 2);
+  displayLines = 1;
+  display("EPISODES", game.episodes + "");
+  display("HIGH SCORE", game.highScore + "");
+  display("FRAME SPEED", frameSpeed + "");
+}
 
-  text("HIGHSCORE", leftMargin, lineHeight * 4);
-  text(game.highScore, leftMargin, lineHeight * 5);
+void display(String title, String value){
+  fill(#333333);
+  textAlign(LEFT,CENTER);
+  textSize(9);
+  text(title, leftMargin, lineHeight * displayLines);
+  displayLines++;
+  textSize(11);
+  text(value, leftMargin, lineHeight * displayLines);
+  displayLines+=2;
 }
 
 // key interaction

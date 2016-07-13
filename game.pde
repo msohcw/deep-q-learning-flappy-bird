@@ -14,8 +14,8 @@ class FlappyBird {
   	int obstacleWidth = 20;
 	int obstacleSpeed = 2;
   	
-  	int difficulty = 60; // larger is easier
-  	int playerWidth = 10;
+  	int difficulty = 50; // larger is easier
+  	int playerWidth = 12;
   	int playerHeight = 10;
 
   	int highScore = 0;
@@ -84,6 +84,11 @@ class FlappyBird {
 		noStroke();
 		fill(#CC0000);
 		rect(position.x, position.y-playerHeight/2, playerWidth, playerHeight);
+		fill(#990000);
+		rect(position.x, position.y-playerHeight/4, playerWidth*3/4, playerHeight*3/4 - 1);
+		fill(#EAB804);
+		rect(position.x + playerWidth - 2, position.y - 2, 3, 2);
+
 
 		for (int i = 0; i < obstacles.size(); i++) {
 		  Obstacle o = obstacles.get(i);
