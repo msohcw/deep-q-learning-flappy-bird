@@ -2,14 +2,14 @@ int stageWidth, stageHeight;
 int playerWidth, playerHeight;
 FlappyBird game;
 
-boolean humanPlayer = false;
+boolean humanPlayer = true;
 
 void setup(){
-  size(300, 200);
-  stageWidth = 300;
-  stageHeight = 200;
-
-  game = new FlappyBird(PhysicsModel.MOVE);
+  size(200, 300);
+  stageWidth = 200;
+  stageHeight = 300;
+  
+  game = new FlappyBird(PhysicsModel.JUMP);
 }
 
 void draw(){
