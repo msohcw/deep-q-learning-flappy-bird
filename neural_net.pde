@@ -2,8 +2,6 @@ import org.ejml.simple.*;
 import org.ejml.data.*;
 import java.util.Random;
 
-ArrayList<Datum> data = new ArrayList<Datum>();
-
 //hyperparameters
 enum Layer {
   INPUT, HIDDEN, OUTPUT
@@ -50,8 +48,8 @@ class NeuralNet {
     }else{
       addLayer(layerSizes[layerSizes.length - 1], Layer.OUTPUT, Activation.RELU);
     }
-    connectLayers();
     this.batchSize = batchSize;
+    connectLayers();
   }
 
   void addLayer(int size, Layer l, Activation fn){
@@ -143,6 +141,10 @@ class NeuralNet {
       g[i] = g[i].scale(momentDecay).plus(1-momentDecay,delta[i].elementPower(2)); // g' = gamma * g + (1-gamma) * delta^2
     }
   }
+
+  void copy(NeuralNet other){
+    for(int i = 1; i < ctLayers; i++) W[i] = other.W[i];
+  }
 }
 
 SimpleMatrix rowSum(SimpleMatrix a){
@@ -163,29 +165,3 @@ SimpleMatrix ones(int l){
 float sigmoid(float x) { return 1.0f/(1.0f+exp(-1.0f*x)); }
 float relu(float x) { return max(0,x); }
 float linear(float x) { return x; }
-
-class Datum {
-  State s;
-  State sP; //s prime
-  float reward;
-  double error;
-  boolean gameOver;
-  
-  Datum(State _s, State _sP, float _reward, boolean _gameOver){
-    this.s = new State(_s);
-    this.sP = new State(_sP);
-    // this.reward = min(max(_reward/maxReward,-1),1);
-    this.reward = (_reward > 0) ? 0.1 : -0.1;
-    this.gameOver = _gameOver;
-    this.error = 100000;
-  }
-  
-  void setError(double e){
-    this.error = e;
-  }
-  
-  @Override 
-  public String toString(){
-    return this.error + "";
-  }
-}

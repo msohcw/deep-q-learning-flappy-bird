@@ -9,15 +9,17 @@ boolean humanPlayer = false;
 int frameSpeed = 1;
 int frame = 0;
 
-int leftMargin, lineHeight, displayLines;
+int leftMargin, topMargin, lineHeight, displayLines;
 
 ArrayList<Integer> pointsHistory = new ArrayList<Integer>();
-int HISTORY_INTERVAL = 50000;
+int HISTORY_INTERVAL = 3000;
 int median = 0;
 int histogramBuckets = 20;
 int histogramHeight = 50;
 int histogramMax;
+boolean drawHistogram = false;
 int[] histogram = new int[histogramBuckets];
+double averageError = 0;
 
 void setup(){
   size(300, 250);
@@ -25,28 +27,37 @@ void setup(){
   stageHeight = 250;
 
   leftMargin = stageWidth + 10;
-  lineHeight = 12;
+  topMargin = 10;
+  lineHeight = 15;
   displayLines = 0;
   
-  game = new FlappyBird(PhysicsModel.JUMP);
-  agent = new Learner(0.0000001f, 0.1, 0.95);
+  game = new FlappyBird(PhysicsModel.MOVE);
+  agent = new Learner(0.000001f, 0.001f, 0.95);
 }
 
 void draw(){
   if(!humanPlayer){
     agent.viewWorld(game.currentState());
     for(int i = 0; i< frameSpeed; i++){
-      game.takeAction(agent.act());
-      game.nextFrame(); 
-      agent.viewWorld(game.currentState());
-      
-      int reward = game.points;
-      if(game.terminal){
-        reward = min(-1, -100 * game.highScore);
-        record(game.points);
+      if(frame == 0){
+        game.takeAction(agent.act());
+      }else{
+        // game.takeAction(Action.DOWN);
       }
+      game.nextFrame(); 
+      
+      // if(frame == 0){
+        agent.viewWorld(game.currentState());
+        
+        float reward = (float)game.points/(float)(game.highScore);
+        if(game.terminal){
+          reward = -1;
+          record(game.points);
+        }
 
-      agent.learn(reward);
+       if(frame == 0) agent.learn(reward, game.terminal);
+      // }
+      frame = (frame + 1) % 7;
     }
   }else{
     game.nextFrame();             
@@ -61,18 +72,25 @@ void draw(){
   fill(#EFEFEF);
   rect(stageWidth,0, 300 - stageWidth,stageHeight);
   
-  displayLines = 1;
+  displayLines = 0;
   display("EPISODES", game.episodes + "");
   display("HIGH SCORE", game.highScore + "");
   display("MEDIAN", median + "");
   display("FRAME SPEED", frameSpeed + "");
   display("EPSILON", agent.epsilon + "");
+  display("ERROR", averageError + "");
+  
+  if(drawHistogram){
+    fill(#00CC00);
+    drawHistogram = false;
+  }else{
+    fill(#333333);
+  }
 
-  fill(#333333);
   for(int i = 0; i < histogramBuckets; i++){
     float height = (float) histogram[i] / (float) histogramMax * (float) histogramHeight;
     float y = (float) histogramHeight - height;
-    rect(leftMargin + i * 4, lineHeight * displayLines + y, 3, height);
+    rect(leftMargin + i * 4, topMargin + lineHeight * displayLines + y, 3, height);
   }
 }
 
@@ -82,30 +100,29 @@ void record(int points){
     Collections.sort(pointsHistory);
     int s = pointsHistory.size();
     median = pointsHistory.get(s/2);
-    
-    if(pointsHistory.get(s-1) > histogramBuckets){
-      int bucketSize = (pointsHistory.get(s-1) - pointsHistory.get(0))/histogramBuckets;
-      for(int i = 0; i < s; i++){
-        int bucket = min(floor(pointsHistory.get(i)/bucketSize),histogramBuckets-1);
-        histogram[bucket]++;
-      }
-      histogramMax = 0;
-      for(int i = 0; i < histogramBuckets; i++) histogramMax = max(histogramMax, histogram[i]);
+    histogramBuckets = min(pointsHistory.get(s-1), 20); 
+    int bucketSize = (pointsHistory.get(s-1) - pointsHistory.get(0))/histogramBuckets;
+    for(int i = 0; i < s; i++){
+      int bucket = min(floor((float) pointsHistory.get(i)/ (float) bucketSize),histogramBuckets-1);
+      histogram[bucket]++;
     }
-
+    histogramMax = 0;
+    for(int i = 0; i < histogramBuckets; i++) histogramMax = max(histogramMax, histogram[i]);
+    drawHistogram = true;
     pointsHistory.clear();
   }
 }
 
 void display(String title, String value){
   fill(#333333);
-  textAlign(LEFT,CENTER);
+  textAlign(LEFT,TOP);
   textSize(9);
-  text(title, leftMargin, lineHeight * displayLines);
+  text(title, leftMargin, topMargin + lineHeight * displayLines);
   displayLines++;
+  textAlign(LEFT,CENTER);
   textSize(11);
-  text(value, leftMargin, lineHeight * displayLines);
-  displayLines+=2;
+  text(value, leftMargin, topMargin + lineHeight * displayLines);
+  displayLines++;
 }
 
 // key interaction
@@ -115,7 +132,7 @@ void keyReleased() {
     if(keyCode == UP) game.takeAction(Action.UP);
     if(keyCode == DOWN) game.takeAction(Action.DOWN);
   }else{
-    if(keyCode == UP) frameSpeed += 100000;
+    if(keyCode == UP) frameSpeed += 1000;
     if(keyCode == DOWN) frameSpeed = 1;
   }
 }

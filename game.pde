@@ -18,7 +18,7 @@ class FlappyBird {
   	int playerWidth = 12;
   	int playerHeight = 10;
 
-  	int highScore = 0;
+  	int highScore = 1;
 
   	int episodes = 0;
   	int points = 0;

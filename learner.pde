@@ -18,12 +18,17 @@ class Learner{
 	float learningRate;
 	float discount;
 
-	int replayLength = 20;
+	int replayLength = 100;
+	int replays = 0;
 
 	float[] stateCoords;
 	float[] statePrimeCoords;
 
 	NeuralNet Q, Target;
+
+	ArrayList<Experience> memory = new ArrayList<Experience>();
+	int MAX_MEMORY = 1000000;
+	int MIN_MEMORY = 10000;
 
 	int lastAction = 0;
 
@@ -33,7 +38,7 @@ class Learner{
 		this.learningRate = learningRate;
 		this.discount = discount;
 
-		int[] layers = {DIMENSIONS, 10, 10, 2};
+		int[] layers = {DIMENSIONS, 32, 2};
 		Q = new NeuralNet(layers, replayLength, true);
 		Target = new NeuralNet(layers, replayLength, true);
 	}
@@ -51,7 +56,6 @@ class Learner{
 		if(random(1) > epsilon){
 			//act based on stateCoords
 			double[] actions = getOutputOf(Q, stateCoords);
-			if(random(1) < 0.01) println(actions[0]);
 			choice = (actions[0] > actions[1]) ? 0 : 1;
 		}else{
 			choice = (random(1) > 0.5f) ? 0 : 1;
@@ -66,19 +70,79 @@ class Learner{
 		}
 	}
 
-	void learn(float reward){
-		// float previousQ = Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]][lastAction];
-		// float[] possibleActions = Q[statePrimeCoords[0]][statePrimeCoords[1]][statePrimeCoords[2]][statePrimeCoords[3]];
-		// float maxFutureReward = max(possibleActions[0], possibleActions[1]);
-
-		//Q update equation
-		// Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]][lastAction] = previousQ + learningRate * (reward + discount * maxFutureReward - previousQ);
-		
+	void learn(float reward, boolean terminal){
+		double[] s0, s1;
+		s0 = new double[DIMENSIONS]; 
+		s1 = new double[DIMENSIONS];
+		for(int i = 0; i < DIMENSIONS; i++){
+			s0[i] = stateCoords[i];
+			s1[i] = statePrimeCoords[i];
+		}
+		addExperience(s0, s1, lastAction, reward, terminal);
+		if(game.episodes % 2 == 0) experienceReplay();
 		// prepare to act based on new state
 		stateCoords = statePrimeCoords;
-
 		// lower exploration rate
-		epsilon = max(0, epsilon - deltaEpsilon);	
+		epsilon = max(0.1, epsilon - deltaEpsilon);	
+	}
+
+	void experienceReplay(){
+		if(memory.size() < MIN_MEMORY) return;
+		int[] replayId = new int[replayLength];
+		double[][] s0Matrix = new double[replayLength][DIMENSIONS];
+		double[][] s1Matrix = new double[replayLength][DIMENSIONS];
+		
+		for(int i = 0; i < replayLength; i++){
+			replayId[i] = floor(random(memory.size())); // get random experience
+			Experience e = memory.get(replayId[i]);
+			s0Matrix[i] = e.s0;	
+			s1Matrix[i] = e.s1;	
+		}
+
+		double[][] targetMatrix;
+		if(memory.size() < MIN_MEMORY + 2000){
+			Q.input(s1Matrix);
+			Q.feedForward();
+			targetMatrix = Q.output();
+		}else{
+			Target.input(s1Matrix);
+			Target.feedForward();
+			targetMatrix = Target.output();
+		}
+		
+		Q.input(s0Matrix);
+		Q.nesterov();
+		Q.feedForward();
+
+		double[][] outputMatrix = Q.output();
+
+		for(int i = 0; i < replayLength; i++){
+			Experience e = memory.get(replayId[i]);
+			double maxFutureReward = (targetMatrix[i][0] > targetMatrix[i][1])? targetMatrix[i][0] : targetMatrix[i][1];
+			if(e.terminal){
+				targetMatrix[i][e.action] = (double) e.reward; 
+			}else{
+				targetMatrix[i][e.action] = (double) e.reward + discount * maxFutureReward; 
+			}
+			targetMatrix[i][1-e.action] = outputMatrix[i][1-e.action];
+		}
+
+		Q.target(targetMatrix);
+		double error = Q.calculateError();
+		// averageError = averageError / game.episodes + error;
+		averageError = error;
+		Q.backPropagate();
+
+		if(replays == 0){
+			Target.copy(Q);
+		}
+		replays = (replays + 1) % 1500;
+	}
+
+	void addExperience(double[] s0, double[] s1, int action, float reward, boolean terminal){
+		Experience e = new Experience(s0,s1,action,reward,terminal);
+		if(memory.size() > MAX_MEMORY) memory.remove(0);
+		memory.add(e);
 	}
 
 	private double[] getOutputOf(NeuralNet N, float[] inputs){
@@ -97,11 +161,26 @@ class Learner{
 			// update minmax if exceeded
 			if(coord < minmax[i][0]) minmax[i][0] = coord;
 			if(coord > minmax[i][1]) minmax[i][1] = coord;
-			
 			// normalise coord
 			coord = (coord - minmax[i][0]) / (minmax[i][1] - minmax[i][0]);
 			coord -= 0.5;
+			coordinates[i] = coord;
 		}
 		return coordinates;
 	}
+}
+
+class Experience {
+  double[] s0, s1;
+  int action;
+  float reward;
+  boolean terminal;
+  
+  Experience(double[] s0, double[] s1, int action, float reward, boolean terminal){
+  	this.s0 = s0;
+  	this.s1 = s1;
+  	this.action = action;
+  	this.reward = reward;
+  	this.terminal = terminal;
+  }
 }
