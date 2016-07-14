@@ -31,7 +31,7 @@ void setup(){
   lineHeight = 15;
   displayLines = 0;
   
-  game = new FlappyBird(PhysicsModel.MOVE);
+  game = new FlappyBird(PhysicsModel.JUMP);
   agent = new Learner(0.000001f, 0.001f, 0.95);
 }
 
@@ -39,15 +39,16 @@ void draw(){
   if(!humanPlayer){
     agent.viewWorld(game.currentState());
     for(int i = 0; i< frameSpeed; i++){
+      
       if(frame == 0){
         game.takeAction(agent.act());
       }else{
-        // game.takeAction(Action.DOWN);
+        game.takeAction(Action.DOWN);
       }
+
       game.nextFrame(); 
       
-      // if(frame == 0){
-        agent.viewWorld(game.currentState());
+      if(frame == 0) agent.viewWorld(game.currentState());
         
         float reward = (float)game.points/(float)(game.highScore);
         if(game.terminal){
@@ -55,9 +56,8 @@ void draw(){
           record(game.points);
         }
 
-       if(frame == 0) agent.learn(reward, game.terminal);
-      // }
-      frame = (frame + 1) % 4;
+      if(frame == 0) agent.learn(reward, game.terminal);
+      frame = (frame + 1) % 7;
     }
   }else{
     game.nextFrame();             

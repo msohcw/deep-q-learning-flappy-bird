@@ -99,11 +99,15 @@ class Learner{
 			s1Matrix[i] = e.s1;	
 		}
 
+		double[][] maxActionMatrix;
 		double[][] targetMatrix;
+
+		Q.input(s1Matrix);
+		Q.feedForward();
+		maxActionMatrix = Q.output();
+
 		if(memory.size() < MIN_MEMORY + 2000){
-			Q.input(s1Matrix);
-			Q.feedForward();
-			targetMatrix = Q.output();
+			targetMatrix = maxActionMatrix;
 		}else{
 			Target.input(s1Matrix);
 			Target.feedForward();
@@ -118,12 +122,21 @@ class Learner{
 
 		for(int i = 0; i < replayLength; i++){
 			Experience e = memory.get(replayId[i]);
-			double maxFutureReward = (targetMatrix[i][0] > targetMatrix[i][1])? targetMatrix[i][0] : targetMatrix[i][1];
+			
+			// select the maximising action
+			int maximisingAction = 0;
+			if(maxActionMatrix[i][1] > maxActionMatrix[i][0]){
+				maximisingAction = 1;
+			}
+
+			double maxFutureReward = targetMatrix[i][maximisingAction];
+
 			if(e.terminal){
 				targetMatrix[i][e.action] = (double) e.reward; 
 			}else{
 				targetMatrix[i][e.action] = (double) e.reward + discount * maxFutureReward; 
 			}
+			
 			targetMatrix[i][1-e.action] = outputMatrix[i][1-e.action];
 		}
 
