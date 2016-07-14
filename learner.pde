@@ -50,17 +50,8 @@ class Learner{
 		int choice;
 		if(random(1) > epsilon){
 			//act based on stateCoords
-			double[][] inputs = new double[replayLength][DIMENSIONS];
-			for(int i = 0; i < replayLength; i++)
-				for(int j = 0; j < DIMENSIONS; j++)
-					inputs[i][j] = 0;	
-
-			for(int i = 0; i < DIMENSIONS; i++) inputs[0][i] = stateCoords[i];
-			
-			Q.input(inputs);
-			Q.feedForward();
-
-			double[] actions = Q.output()[0];
+			double[] actions = getOutputOf(Q, stateCoords);
+			if(random(1) < 0.01) println(actions[0]);
 			choice = (actions[0] > actions[1]) ? 0 : 1;
 		}else{
 			choice = (random(1) > 0.5f) ? 0 : 1;
@@ -88,6 +79,14 @@ class Learner{
 
 		// lower exploration rate
 		epsilon = max(0, epsilon - deltaEpsilon);	
+	}
+
+	private double[] getOutputOf(NeuralNet N, float[] inputs){
+		double[][] inputMatrix = new double[replayLength][DIMENSIONS];
+		for(int i = 0; i < DIMENSIONS; i++) inputMatrix[0][i] = inputs[i];	
+		N.input(inputMatrix);
+		N.feedForward();
+		return N.output()[0];
 	}
 
 	private float[] normalise(State s){
