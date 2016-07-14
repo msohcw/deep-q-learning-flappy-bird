@@ -4,7 +4,8 @@ FlappyBird game;
 Learner agent;
 
 boolean humanPlayer = false;
-int frameSpeed = 50;
+int frameSpeed = 1;
+int frame = 0;
 
 int leftMargin, lineHeight, displayLines;
 
@@ -17,19 +18,28 @@ void setup(){
   lineHeight = 12;
   displayLines = 0;
   
-  game = new FlappyBird(PhysicsModel.JUMP);
-  agent = new Learner(0.0000001f, 0.01, 0.9);
+  game = new FlappyBird(PhysicsModel.MOVE);
+  agent = new Learner(0.0000001f, 0.1, 0.95);
 }
 
 void draw(){
   if(!humanPlayer){
     agent.viewWorld(game.currentState());
     for(int i = 0; i< frameSpeed; i++){
-      game.takeAction(agent.act());
+      // if(frame == 0){
+        game.takeAction(agent.act());
+      // }else{
+      //   agent.lastAction = 0;
+      //   game.takeAction(Action.DOWN);
+      // }
       game.nextFrame();             
       agent.viewWorld(game.currentState());
-      agent.learn(game.points);
+      int reward = (game.terminal)? min(-100 * game.highScore, -1) : game.points;
+      agent.learn(reward);
+      frame = (frame + 1) % 7;
     }
+  }else{
+    game.nextFrame();             
   }
   
   // draw game graphics
@@ -65,6 +75,9 @@ void keyReleased() {
   if(humanPlayer){
     if(keyCode == UP) game.takeAction(Action.UP);
     if(keyCode == DOWN) game.takeAction(Action.DOWN);
+  }else{
+    if(keyCode == UP) frameSpeed += 100000;
+    if(keyCode == DOWN) frameSpeed = 1;
   }
 }
 

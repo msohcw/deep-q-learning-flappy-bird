@@ -1,5 +1,5 @@
 int DIMENSIONS = 4;
-int[] BUCKETS = {10,10,10,10};
+int[] BUCKETS = {40,40,40,40};
 
 class Learner{
 	// distance to obstacle
@@ -38,6 +38,7 @@ class Learner{
 			// s' is view of the world
 			statePrimeCoords = snap(s);
 		}
+		// if(random(1) < 0.01) println(statePrimeCoords);
 	}
 
 	Action act(){
@@ -46,8 +47,10 @@ class Learner{
 			//act based on stateCoords
 			float[] actions = Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]];
 			choice = (actions[0] > actions[1]) ? 0 : 1;
+			// if(random(1) < 0.001) println(actions);
 		}else{
-			choice = (random(1) > 0.1) ? 0 : 1;
+			choice = (random(1) > 0.5f) ? 0 : 1;
+			// println(choice);
 		}
 		
 		lastAction = choice;
@@ -61,6 +64,7 @@ class Learner{
 	void learn(float reward){
 		// learn from statePrime
 		float previousQ = Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]][lastAction];
+		// println(reward);
 		float[] possibleActions = Q[statePrimeCoords[0]][statePrimeCoords[1]][statePrimeCoords[2]][statePrimeCoords[3]];
 		float maxFutureReward = max(possibleActions[0], possibleActions[1]);
 
@@ -70,7 +74,7 @@ class Learner{
 		stateCoords = statePrimeCoords;
 
 		// lower exploration rate
-		epsilon = max(0, epsilon - deltaEpsilon);	
+		epsilon = max(0.1, epsilon - deltaEpsilon);	
 	}
 
 	private int[] snap(State s){
@@ -83,8 +87,9 @@ class Learner{
 			if(coord > minmax[i][1]) minmax[i][1] = coord;
 			
 			// normalise coord
-			coord = (coord - minmax[i][1]) / (minmax[i][1] - minmax[i][0]);
-			coordinates[i] = round(coord/(float) BUCKETS[i]);
+			coord = (coord - minmax[i][0]) / (minmax[i][1] - minmax[i][0]);
+			// println(coord);
+			coordinates[i] = round(coord * ((float) BUCKETS[i] - 1));
 		}
 		return coordinates;
 	}

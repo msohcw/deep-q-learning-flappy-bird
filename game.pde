@@ -12,7 +12,7 @@ class FlappyBird {
 
 	int obstacleGap = 100;
   	int obstacleWidth = 20;
-	int obstacleSpeed = 2;
+	int obstacleSpeed = 3;
   	
   	int difficulty = 50; // larger is easier
   	int playerWidth = 12;
@@ -22,6 +22,9 @@ class FlappyBird {
 
   	int episodes = 0;
   	int points = 0;
+  	int dist = 0;
+
+  	boolean terminal = false;
 
   	PVector position, velocity, acceleration;
 
@@ -32,7 +35,11 @@ class FlappyBird {
 	}
 
 	public void nextFrame(){
-		
+		if(terminal){
+			reset();
+			terminal = false;
+		}
+
 		// player
 		applyForces();
 		velocity.y += acceleration.y;
@@ -48,6 +55,8 @@ class FlappyBird {
 		  }
 		}
 
+		dist++;
+
 
 		Obstacle last = obstacles.get(obstacles.size()-1);
 		if(last.topLeft.x + obstacleWidth + obstacleGap <= stageWidth) addObstacleAt(stageWidth);
@@ -56,12 +65,12 @@ class FlappyBird {
 
 		Obstacle first = obstacles.get(0);
 
-		if(position.y + playerWidth/2 > stageHeight) reset();
-		if(position.y - playerWidth/2 < 0) reset();
+		if(position.y + playerWidth/2 > stageHeight) gameOver();
+		if(position.y - playerWidth/2 < 0) gameOver();
 		//upper
-		if(intersectAABB(position.x,position.y-playerHeight/2, playerWidth, playerHeight,first.topLeft.x,0,obstacleWidth,first.topLeft.y-first.gapHeight)) reset();
+		if(intersectAABB(position.x,position.y-playerHeight/2, playerWidth, playerHeight,first.topLeft.x,0,obstacleWidth,first.topLeft.y-first.gapHeight)) gameOver();
 		//lower
-		if(intersectAABB(position.x,position.y-playerHeight/2, playerWidth, playerHeight,first.topLeft.x,first.topLeft.y,obstacleWidth,stageHeight-first.topLeft.y)) reset();
+		if(intersectAABB(position.x,position.y-playerHeight/2, playerWidth, playerHeight,first.topLeft.x,first.topLeft.y,obstacleWidth,stageHeight-first.topLeft.y)) gameOver();
 			
 	}
 
@@ -139,9 +148,13 @@ class FlappyBird {
 
 	// internal game methods
 
+	private void gameOver(){
+		terminal = true;
+	}
+
 	private void reset(){
-		// clear old game objects
-		
+		// clear old game objects		
+
 		obstacles.clear();
 
 		// reset game statistics
@@ -149,6 +162,7 @@ class FlappyBird {
 		episodes++;
 		highScore = max(points,highScore);
 		points = 0;
+		dist = 0;
 
 		// reset game physics
 
@@ -185,8 +199,10 @@ class FlappyBird {
 				break;
 			case JUMP:
 				acceleration.y = 0.25;
+				break;
 			case HOVER:
 				acceleration.y += 0.1;
+				break;
 		}
 	}
 
@@ -200,6 +216,7 @@ class FlappyBird {
 				velocity.y = -5; // flappy bird is not the real life
 				break;
 			case HOVER:
+				break;
 		}
 	}
 
@@ -209,7 +226,9 @@ class FlappyBird {
 				position.y += 10;
 				break;
 			case JUMP:
+				break;
 			case HOVER:
+				break;
 		}
 	}
 }
