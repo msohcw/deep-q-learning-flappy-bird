@@ -10,10 +10,10 @@ class Learner{
 
 
 	float[][][][][] Q = new float[BUCKETS[0]][BUCKETS[1]][BUCKETS[2]][BUCKETS[3]][2];
-	float[][] minmax = {{0,90},  //best guess
+	float[][] minmax = {{10,90},	//best guess
 						{-25,25},
 						{-25,25},
-						{-10,7}};
+						{-7,7}};
 	float epsilon, deltaEpsilon;
 	float learningRate;
 	float discount;
@@ -32,13 +32,10 @@ class Learner{
 
 	void viewWorld(State s){
 		if(statePrimeCoords == null){
-			// initialise world
-			statePrimeCoords = stateCoords = snap(s);
+			statePrimeCoords = stateCoords = snap(s);	// initialise world
 		}else{
-			// s' is view of the world
-			statePrimeCoords = snap(s);
+			statePrimeCoords = snap(s); 				// s' is view of the world
 		}
-		// if(random(1) < 0.01) println(statePrimeCoords);
 	}
 
 	Action act(){
@@ -47,13 +44,12 @@ class Learner{
 			//act based on stateCoords
 			float[] actions = Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]];
 			choice = (actions[0] > actions[1]) ? 0 : 1;
-			// if(random(1) < 0.001) println(actions);
 		}else{
 			choice = (random(1) > 0.5f) ? 0 : 1;
-			// println(choice);
 		}
 		
 		lastAction = choice;
+
 		if(choice == 0){
 			return Action.DOWN;
 		}else{
@@ -62,12 +58,11 @@ class Learner{
 	}
 
 	void learn(float reward){
-		// learn from statePrime
 		float previousQ = Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]][lastAction];
-		// println(reward);
 		float[] possibleActions = Q[statePrimeCoords[0]][statePrimeCoords[1]][statePrimeCoords[2]][statePrimeCoords[3]];
 		float maxFutureReward = max(possibleActions[0], possibleActions[1]);
 
+		//Q update equation
 		Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]][lastAction] = previousQ + learningRate * (reward + discount * maxFutureReward - previousQ);
 		
 		// prepare to act based on new state
@@ -88,7 +83,6 @@ class Learner{
 			
 			// normalise coord
 			coord = (coord - minmax[i][0]) / (minmax[i][1] - minmax[i][0]);
-			// println(coord);
 			coordinates[i] = round(coord * ((float) BUCKETS[i] - 1));
 		}
 		return coordinates;

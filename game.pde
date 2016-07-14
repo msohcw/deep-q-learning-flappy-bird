@@ -119,7 +119,6 @@ class FlappyBird {
 		  rect(o.topLeft.x, o.topLeft.y - o.gapHeight - 10, obstacleWidth, 10);
 		  
 		  //lower
-		  // rect(o.topLeft.x, o.topLeft.y, obstacleWidth, stageHeight - o.topLeft.y);
 
 		  fill(#11AA11);
 		  rect(o.topLeft.x, o.topLeft.y + 10, obstacleWidth, stageHeight - o.topLeft.y - 10);
@@ -150,24 +149,19 @@ class FlappyBird {
 	}
 
 	private void reset(){
-		// clear old game objects		
-
-		obstacles.clear();
+		obstacles.clear(); // clear old game objects		
 
 		// reset game statistics
-
 		episodes++;
 		highScore = max(points,highScore);
 		points = 0;
 
 		// reset game physics
-
 		position = new PVector(0, stageHeight/2);
 		velocity = new PVector(0,0);
 		acceleration = new PVector(0,0);
 
 		// add new objects
-
 		for(int i = 0; i < floor(stageWidth / (obstacleGap + obstacleWidth)); i++){
 			addObstacleAt(obstacleGap + (obstacleGap + obstacleWidth) * i);	
 		}
