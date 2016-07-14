@@ -234,6 +234,10 @@ class State{
 		coordinates = m;
 	}
 
+	State(State s){
+		this.coordinates = s.coordinates;
+	}
+
 	void setDimension(int i, float x){
 		coordinates[i] = x;
 	}

@@ -1,22 +1,14 @@
-import org.ejml.simple.*; //<>// //<>//
+import org.ejml.simple.*;
 import org.ejml.data.*;
 import java.util.Random;
-
-//NeuralNet net = new NeuralNet();
 
 ArrayList<Datum> data = new ArrayList<Datum>();
 
 //hyperparameters
-float initVariance = 0.05; // range of values for inital dendrite weights
-double learningRate = 0.00003;
-double momentumSize = 0.9;
-double momentDecay = 0.9;
-
-int batchSize = REPLAY_LENGTH;
-
 enum Layer {
   INPUT, HIDDEN, OUTPUT
 }
+
 enum Activation {
   SIGMOID, LINEAR, RELU
 }
@@ -38,14 +30,19 @@ class NeuralNet {
   SimpleMatrix[] delta = new SimpleMatrix[10];
   SimpleMatrix y;
   
+  float initVariance = 0.05;
+  double learningRate = 0.00003;
+  double momentumSize = 0.9;
+  double momentDecay = 0.9;
+
+  int batchSize;
+
   int ctNeurons = 0;
   int ctDendrites = 0;
   int ctLayers = 0;
   int outputIndex;
-  //double[] onesArray;
-  //SimpleMatrix ones;
 
-  NeuralNet(int[] layerSizes, boolean regression){
+  NeuralNet(int[] layerSizes, int batchSize, boolean regression){
     addLayer(layerSizes[0], Layer.INPUT, Activation.RELU);
     for(int i = 1; i < layerSizes.length - 1; i++) addLayer(layerSizes[i], Layer.HIDDEN, Activation.RELU);
     if(regression){
@@ -54,6 +51,7 @@ class NeuralNet {
       addLayer(layerSizes[layerSizes.length - 1], Layer.OUTPUT, Activation.RELU);
     }
     connectLayers();
+    this.batchSize = batchSize;
   }
 
   void addLayer(int size, Layer l, Activation fn){
@@ -81,10 +79,12 @@ class NeuralNet {
     a[0] = a[0].combine(SimpleMatrix.END,0, ones(batchSize));
   }
 
-  float[] output(){
-    float[] outputs = new float[layers[ctLayers-1]];
+  double[][] output(){
+    double[][] outputs = new double[batchSize][layers[ctLayers-1]];
     for(int i = 0; i < layers[ctLayers-1]; i++){
-     outputs[i] = (float) a[ctLayers-1].get(i);
+      for(int j = 0; j < batchSize; j++){
+        outputs[j][i] = (float) a[ctLayers-1].get(i, j);
+      }
     }
     return outputs;
   }
@@ -100,8 +100,6 @@ class NeuralNet {
     }
   }
   
-  
-
   void feedForward(){
     for(int i = 1; i < ctLayers; i++){
       z[i] = W[i].mult(a[i-1]);
@@ -157,7 +155,7 @@ SimpleMatrix rowSum(SimpleMatrix a){
 SimpleMatrix ones(int l){
   double[] seq = new double[l];
   for(int i = 0 ; i < seq.length; i++) seq[i] = 1;
-  SimpleMatrix ret = new SimpleMatrix(1,batchSize);
+  SimpleMatrix ret = new SimpleMatrix(1,l);
   ret.setRow(0,0,seq);
   return ret;
 }
@@ -176,8 +174,8 @@ class Datum {
   Datum(State _s, State _sP, float _reward, boolean _gameOver){
     this.s = new State(_s);
     this.sP = new State(_sP);
-    this.reward = min(max(_reward/maxReward,-1),1);
-    //this.reward = (_reward > 0) ? 0.1 : -0.1;
+    // this.reward = min(max(_reward/maxReward,-1),1);
+    this.reward = (_reward > 0) ? 0.1 : -0.1;
     this.gameOver = _gameOver;
     this.error = 100000;
   }

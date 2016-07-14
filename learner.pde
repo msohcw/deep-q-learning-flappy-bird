@@ -1,3 +1,5 @@
+import java.util.Arrays;
+
 int DIMENSIONS = 4;
 int[] BUCKETS = {10,40,40,20};
 
@@ -6,10 +8,8 @@ class Learner{
 	// height above lower pipe
 	// height below upper pipe
 	// velocity
-	// action 
+	// action
 
-
-	float[][][][][] Q = new float[BUCKETS[0]][BUCKETS[1]][BUCKETS[2]][BUCKETS[3]][2];
 	float[][] minmax = {{10,90},	//best guess
 						{-25,25},
 						{-25,25},
@@ -18,8 +18,12 @@ class Learner{
 	float learningRate;
 	float discount;
 
-	int[] stateCoords;
-	int[] statePrimeCoords;
+	int replayLength = 20;
+
+	float[] stateCoords;
+	float[] statePrimeCoords;
+
+	NeuralNet Q, Target;
 
 	int lastAction = 0;
 
@@ -28,13 +32,17 @@ class Learner{
 		this.deltaEpsilon = deltaEpsilon;
 		this.learningRate = learningRate;
 		this.discount = discount;
+
+		int[] layers = {DIMENSIONS, 10, 10, 2};
+		Q = new NeuralNet(layers, replayLength, true);
+		Target = new NeuralNet(layers, replayLength, true);
 	}
 
 	void viewWorld(State s){
 		if(statePrimeCoords == null){
-			statePrimeCoords = stateCoords = snap(s);	// initialise world
+			statePrimeCoords = stateCoords = normalise(s);	// initialise world
 		}else{
-			statePrimeCoords = snap(s); 				// s' is view of the world
+			statePrimeCoords = normalise(s); 				// s' is view of the world
 		}
 	}
 
@@ -42,7 +50,17 @@ class Learner{
 		int choice;
 		if(random(1) > epsilon){
 			//act based on stateCoords
-			float[] actions = Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]];
+			double[][] inputs = new double[replayLength][DIMENSIONS];
+			for(int i = 0; i < replayLength; i++)
+				for(int j = 0; j < DIMENSIONS; j++)
+					inputs[i][j] = 0;	
+
+			for(int i = 0; i < DIMENSIONS; i++) inputs[0][i] = stateCoords[i];
+			
+			Q.input(inputs);
+			Q.feedForward();
+
+			double[] actions = Q.output()[0];
 			choice = (actions[0] > actions[1]) ? 0 : 1;
 		}else{
 			choice = (random(1) > 0.5f) ? 0 : 1;
@@ -58,12 +76,12 @@ class Learner{
 	}
 
 	void learn(float reward){
-		float previousQ = Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]][lastAction];
-		float[] possibleActions = Q[statePrimeCoords[0]][statePrimeCoords[1]][statePrimeCoords[2]][statePrimeCoords[3]];
-		float maxFutureReward = max(possibleActions[0], possibleActions[1]);
+		// float previousQ = Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]][lastAction];
+		// float[] possibleActions = Q[statePrimeCoords[0]][statePrimeCoords[1]][statePrimeCoords[2]][statePrimeCoords[3]];
+		// float maxFutureReward = max(possibleActions[0], possibleActions[1]);
 
 		//Q update equation
-		Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]][lastAction] = previousQ + learningRate * (reward + discount * maxFutureReward - previousQ);
+		// Q[stateCoords[0]][stateCoords[1]][stateCoords[2]][stateCoords[3]][lastAction] = previousQ + learningRate * (reward + discount * maxFutureReward - previousQ);
 		
 		// prepare to act based on new state
 		stateCoords = statePrimeCoords;
@@ -72,8 +90,8 @@ class Learner{
 		epsilon = max(0, epsilon - deltaEpsilon);	
 	}
 
-	private int[] snap(State s){
-		int[] coordinates = new int[DIMENSIONS];
+	private float[] normalise(State s){
+		float[] coordinates = new float[DIMENSIONS];
 		for(int i = 0; i < DIMENSIONS; i++){
 			float coord = s.getDimension(i);
 			
@@ -83,7 +101,7 @@ class Learner{
 			
 			// normalise coord
 			coord = (coord - minmax[i][0]) / (minmax[i][1] - minmax[i][0]);
-			coordinates[i] = round(coord * ((float) BUCKETS[i] - 1));
+			coord -= 0.5;
 		}
 		return coordinates;
 	}
