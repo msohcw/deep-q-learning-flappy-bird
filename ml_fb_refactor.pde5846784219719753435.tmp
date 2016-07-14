@@ -72,7 +72,7 @@ void draw(){
   for(int i = 0; i < histogramBuckets; i++){
     float height = (float) histogram[i] / (float) histogramMax * (float) histogramHeight;
     float y = (float) histogramHeight - height;
-    rect(leftMargin + i * 4, lineHeight * displayLines + y, 3, height);
+    rect(leftMargin + i * 3, lineHeight * displayLines + y, 2, height);
   }
 }
 
@@ -82,17 +82,15 @@ void record(int points){
     Collections.sort(pointsHistory);
     int s = pointsHistory.size();
     median = pointsHistory.get(s/2);
-    
     if(pointsHistory.get(s-1) > histogramBuckets){
       int bucketSize = (pointsHistory.get(s-1) - pointsHistory.get(0))/histogramBuckets;
       for(int i = 0; i < s; i++){
-        int bucket = min(floor(pointsHistory.get(i)/bucketSize),histogramBuckets-1);
+        int bucket = max(floor(pointsHistory.get(i)/bucketSize),histogramBuckets);
         histogram[bucket]++;
       }
       histogramMax = 0;
       for(int i = 0; i < histogramBuckets; i++) histogramMax = max(histogramMax, histogram[i]);
     }
-
     pointsHistory.clear();
   }
 }

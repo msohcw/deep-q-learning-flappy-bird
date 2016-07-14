@@ -22,7 +22,6 @@ class FlappyBird {
 
   	int episodes = 0;
   	int points = 0;
-  	int dist = 0;
 
   	boolean terminal = false;
 
@@ -54,8 +53,6 @@ class FlappyBird {
 		  	points++;
 		  }
 		}
-
-		dist++;
 
 
 		Obstacle last = obstacles.get(obstacles.size()-1);
@@ -162,7 +159,6 @@ class FlappyBird {
 		episodes++;
 		highScore = max(points,highScore);
 		points = 0;
-		dist = 0;
 
 		// reset game physics
 

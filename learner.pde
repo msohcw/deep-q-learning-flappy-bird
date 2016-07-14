@@ -1,5 +1,5 @@
 int DIMENSIONS = 4;
-int[] BUCKETS = {40,40,40,40};
+int[] BUCKETS = {10,40,40,20};
 
 class Learner{
 	// distance to obstacle
@@ -74,7 +74,7 @@ class Learner{
 		stateCoords = statePrimeCoords;
 
 		// lower exploration rate
-		epsilon = max(0.1, epsilon - deltaEpsilon);	
+		epsilon = max(0, epsilon - deltaEpsilon);	
 	}
 
 	private int[] snap(State s){
