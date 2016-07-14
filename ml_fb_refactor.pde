@@ -57,7 +57,7 @@ void draw(){
 
        if(frame == 0) agent.learn(reward, game.terminal);
       // }
-      frame = (frame + 1) % 7;
+      frame = (frame + 1) % 4;
     }
   }else{
     game.nextFrame();             
