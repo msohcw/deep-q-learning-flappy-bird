@@ -112,11 +112,18 @@ class NeuralNet {
   
   float calculateError(){
     delta[ctLayers - 1] = (y.minus(a[ctLayers - 1])).negative(); // assumes linear, so f'(x) is 1
-    return (float) y.minus(a[ctLayers - 1]).elementPower(2.0).elementSum() / batchSize;
+    return (float) y.minus(a[ctLayers - 1]).elementPower(2.0).scale(0.5).elementSum() / (float) batchSize;
   }
   
   SimpleMatrix errorMatrice(){
-    return y.minus(a[ctLayers - 1]).elementPower(2.0);
+    return y.minus(a[ctLayers - 1]).elementPower(2.0).scale(0.5);
+  }
+
+  double[] errorArray(){
+    SimpleMatrix e = errorMatrice();
+    double[] ret = new double[batchSize];
+    for(int i = 0; i < batchSize; i++) ret[i] = e.get(0,i);
+    return ret;
   }
 
   void nesterov(){

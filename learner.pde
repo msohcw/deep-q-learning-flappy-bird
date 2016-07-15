@@ -28,7 +28,13 @@ class Learner{
 
 	ArrayList<Experience> memory = new ArrayList<Experience>();
 	int MAX_MEMORY = 1000000;
-	int MIN_MEMORY = 10000;
+	int MIN_MEMORY = 40000;
+	int copyFrequency = 1500;
+
+	int[] memorySegments = new int[replayLength];
+	float priority = 0.65;
+	int sortFrequency = 10000;
+	int lastSort = 0;
 
 	int lastAction = 0;
 
@@ -83,7 +89,7 @@ class Learner{
 		// prepare to act based on new state
 		stateCoords = statePrimeCoords;
 		// lower exploration rate
-		epsilon = max(0.1, epsilon - deltaEpsilon);	
+		epsilon = max(0, epsilon - deltaEpsilon);	
 	}
 
 	void experienceReplay(){
@@ -93,7 +99,7 @@ class Learner{
 		double[][] s1Matrix = new double[replayLength][DIMENSIONS];
 		
 		for(int i = 0; i < replayLength; i++){
-			replayId[i] = floor(random(memory.size())); // get random experience
+			replayId[i] = sampleSegment(i); // get random experience
 			Experience e = memory.get(replayId[i]);
 			s0Matrix[i] = e.s0;	
 			s1Matrix[i] = e.s1;	
@@ -141,21 +147,63 @@ class Learner{
 		}
 
 		Q.target(targetMatrix);
+		
 		double error = Q.calculateError();
 		// averageError = averageError / game.episodes + error;
 		averageError = error;
+		double[] experienceErrors = Q.errorArray();
+		for(int i = 0; i < replayLength; i++){
+			memory.get(replayId[i]).setError(experienceErrors[i]);
+		}
+
 		Q.backPropagate();
 
-		if(replays == 0){
-			Target.copy(Q);
+		if(replays%copyFrequency == 0) Target.copy(Q);
+		if(replays%sortFrequency == 0){
+			sortExperience();
+			calculateSegments();
 		}
-		replays = (replays + 1) % 1500;
+		replays %= (sortFrequency * copyFrequency);
+		replays++;
 	}
 
 	void addExperience(double[] s0, double[] s1, int action, float reward, boolean terminal){
 		Experience e = new Experience(s0,s1,action,reward,terminal);
 		if(memory.size() > MAX_MEMORY) memory.remove(0);
 		memory.add(e);
+	}
+
+	private int sampleSegment(int seg){
+		int s = (seg == 0) ? 0 : memorySegments[seg - 1];
+		int e = (seg == replayLength - 1) ? memory.size() : memorySegments[seg];
+		return floor(random(s,e));
+	}
+
+	private void calculateSegments(){
+		float sum = 0;
+		for(int i = 0; i < memory.size(); i++) sum += pow(1f/float(i), priority);
+		
+		int segments = 0;
+		float cumulative = 0;
+		for(int i = 0; i < memory.size(); i++){
+			cumulative += pow(1f/float(i), priority);
+			if(cumulative > (segments + 1) * sum/replayLength){
+				memorySegments[segments] = i; // memorySegments[i] stores first index of segment(i+1)
+				segments++;
+			}
+		}
+	}
+
+	private void sortExperience(){
+		Comparator<Experience> cmp = new Comparator<Experience>(){
+			@Override
+			public int compare(Experience a, Experience b){
+				if(a.error - b.error < 0) return 1;		// descending sort
+				if(a.error - b.error > 0) return -1;
+              	return 0;
+			}
+		};
+		Collections.sort(memory, cmp);
 	}
 
 	private double[] getOutputOf(NeuralNet N, float[] inputs){
@@ -189,11 +237,18 @@ class Experience {
   float reward;
   boolean terminal;
   
+  double error;
+
   Experience(double[] s0, double[] s1, int action, float reward, boolean terminal){
   	this.s0 = s0;
   	this.s1 = s1;
   	this.action = action;
   	this.reward = reward;
   	this.terminal = terminal;
+  	this.error = 100000;
+  }
+
+  void setError(double e){
+  	this.error = e;
   }
 }

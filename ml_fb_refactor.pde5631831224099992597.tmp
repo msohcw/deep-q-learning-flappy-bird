@@ -1,5 +1,4 @@
 import java.util.Collections;
-import java.util.Comparator;
 
 int stageWidth, stageHeight;
 int playerWidth, playerHeight;
@@ -82,7 +81,7 @@ void draw(){
   display("MEDIAN", median + "");
   display("FRAME SPEED", frameSpeed + "");
   display("EPSILON", significant(agent.epsilon, 6) + "");
-  display("ERROR",  significant(averageError, 8) + "");
+  display("ERROR",  + significant(averageError, 6) + "");
   
   if(drawHistogram){
     fill(#00CC00);
@@ -145,7 +144,7 @@ void keyReleased() {
 }
 
 float significant(double v, int d){
-  return ( round((float) v * pow(10,d)) / pow(10,d) );
+  return ( round((float) v * pow(d,10)) / pow(d,10) );
 }
 
 // import java.util.Arrays;
