@@ -33,7 +33,7 @@ class Learner{
 
 	int[] memorySegments = new int[replayLength];
 	float priority = 0.65;
-	int sortFrequency = 10000;
+	int sortFrequency = 3000;
 	int lastSort = 0;
 
 	int lastAction = 0;
@@ -89,11 +89,18 @@ class Learner{
 		// prepare to act based on new state
 		stateCoords = statePrimeCoords;
 		// lower exploration rate
-		epsilon = max(0, epsilon - deltaEpsilon);	
+		if(memory.size() >= MIN_MEMORY) epsilon = max(0, epsilon - deltaEpsilon);	
 	}
 
 	void experienceReplay(){
 		if(memory.size() < MIN_MEMORY) return;
+
+		if(replays%copyFrequency == 0) Target.copy(Q);
+		if(replays%sortFrequency == 0){
+			sortExperience();
+			calculateSegments();
+		}
+
 		int[] replayId = new int[replayLength];
 		double[][] s0Matrix = new double[replayLength][DIMENSIONS];
 		double[][] s1Matrix = new double[replayLength][DIMENSIONS];
@@ -149,8 +156,7 @@ class Learner{
 		Q.target(targetMatrix);
 		
 		double error = Q.calculateError();
-		// averageError = averageError / game.episodes + error;
-		averageError = error;
+		averageError = averageError * replays / (double)(replays + 1) + error / (double)(replays + 1);
 		double[] experienceErrors = Q.errorArray();
 		for(int i = 0; i < replayLength; i++){
 			memory.get(replayId[i]).setError(experienceErrors[i]);
@@ -158,11 +164,6 @@ class Learner{
 
 		Q.backPropagate();
 
-		if(replays%copyFrequency == 0) Target.copy(Q);
-		if(replays%sortFrequency == 0){
-			sortExperience();
-			calculateSegments();
-		}
 		replays %= (sortFrequency * copyFrequency);
 		replays++;
 	}
@@ -170,7 +171,7 @@ class Learner{
 	void addExperience(double[] s0, double[] s1, int action, float reward, boolean terminal){
 		Experience e = new Experience(s0,s1,action,reward,terminal);
 		if(memory.size() > MAX_MEMORY) memory.remove(0);
-		memory.add(e);
+		memory.add(0, e);
 	}
 
 	private int sampleSegment(int seg){
@@ -181,13 +182,13 @@ class Learner{
 
 	private void calculateSegments(){
 		float sum = 0;
-		for(int i = 0; i < memory.size(); i++) sum += pow(1f/float(i), priority);
+		for(int i = 1; i <= memory.size(); i++) sum += pow(1f/float(i), priority);
 		
 		int segments = 0;
 		float cumulative = 0;
-		for(int i = 0; i < memory.size(); i++){
+		for(int i = 1; i <= memory.size(); i++){ // be careful to start with i = 1
 			cumulative += pow(1f/float(i), priority);
-			if(cumulative > (segments + 1) * sum/replayLength){
+			if(cumulative > (segments + 1) * sum/(float) replayLength){
 				memorySegments[segments] = i; // memorySegments[i] stores first index of segment(i+1)
 				segments++;
 			}
@@ -250,5 +251,10 @@ class Experience {
 
   void setError(double e){
   	this.error = e;
+  }
+
+  @Override
+  public String toString(){
+    return this.error + "";
   }
 }

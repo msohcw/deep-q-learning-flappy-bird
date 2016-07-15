@@ -122,7 +122,7 @@ class NeuralNet {
   double[] errorArray(){
     SimpleMatrix e = errorMatrice();
     double[] ret = new double[batchSize];
-    for(int i = 0; i < batchSize; i++) ret[i] = e.get(0,i);
+    for(int i = 0; i < batchSize; i++) ret[i] = e.extractVector(false, i).elementSum();
     return ret;
   }
 

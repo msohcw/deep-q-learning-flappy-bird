@@ -36,7 +36,7 @@ void setup(){
   displayLines = 0;
   
   game = new FlappyBird(PhysicsModel.JUMP);
-  agent = new Learner(0.000001f, 0.001f, 0.95);
+  agent = new Learner(0.000003f, 0.001f, 0.95);
 }
 
 void draw(){
