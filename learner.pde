@@ -12,14 +12,15 @@ class Learner{
 	// action
 
 	float[][] minmax = {{10,90},	//best guess
-						{-25,25},
+						// {-25,25},
+						{20,50},
 						{-25,25},
 						{-7,7}};
 	float epsilon, deltaEpsilon;
 	float learningRate;
 	float discount;
 
-	int replayLength = 32;
+  int replayLength = 100;
 	long replays = 0;
 
 	float[] stateCoords;
@@ -44,7 +45,7 @@ class Learner{
 	int[] memorySegments = new int[replayLength];
 	float priority = 0.65;
 	float priorityCorrection = 0.1;
-	float priorityCorrectionDelta = 0.000001;
+	float priorityCorrectionDelta = 0.000003;
 	float probabilitySum = 0;
 
 	int lastAction = 0;
@@ -256,7 +257,7 @@ class Learner{
 			if(coord > minmax[i][1]) minmax[i][1] = coord;
 			// normalise coord
 			coord = (coord - minmax[i][0]) / (minmax[i][1] - minmax[i][0]);
-			coord -= 0.5;
+			coord = coord * 2 - 1; // -1 to 1
 			coordinates[i] = coord;
 		}
 		return coordinates;

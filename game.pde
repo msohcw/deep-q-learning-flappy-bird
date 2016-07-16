@@ -85,8 +85,9 @@ class FlappyBird {
 		State s = new State();
 		Obstacle o = obstacles.get(0);
 		s.setDimension(0, o.topLeft.x - playerWidth); // player distance to obstacle
-		s.setDimension(1, o.topLeft.y - (position.y + playerHeight/2)); // player distance to lower pipe
-		s.setDimension(2, (position.y - playerHeight/2) - (o.topLeft.y - o.gapHeight)); // player distance to upper pipe
+		s.setDimension(1, o.gapHeight); // player distance to lower pipe
+		s.setDimension(2, o.topLeft.y - (position.y + playerHeight/2)); // player distance to lower pipe
+		// s.setDimension(2, (position.y - playerHeight/2) - (o.topLeft.y - o.gapHeight)); // player distance to upper pipe
 		s.setDimension(3, velocity.y); // player velocity
 		return s;
 	}
