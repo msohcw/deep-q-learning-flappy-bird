@@ -13,7 +13,7 @@ int frame = 0;
 int leftMargin, topMargin, lineHeight, displayLines;
 
 ArrayList<Integer> pointsHistory = new ArrayList<Integer>();
-int HISTORY_INTERVAL = 5000;
+int HISTORY_INTERVAL = 3000;
 int median = 0;
 int histogramBuckets = 20;
 int histogramHeight = 50;
@@ -36,7 +36,7 @@ void setup(){
   displayLines = 0;
   
   game = new FlappyBird(PhysicsModel.JUMP);
-  agent = new Learner(0.000003f, 0.001f, 0.95);
+  agent = new Learner(0.000003f, 0.0003f, 0.95);
 }
 
 void draw(){
@@ -54,7 +54,7 @@ void draw(){
       
       if(frame == 0) agent.viewWorld(game.currentState());
         
-        float reward = (float)game.points/(float)(game.highScore);
+        float reward = (float)game.points/(float)(max(game.highScore,10));
         if(game.terminal){
           reward = -1;
           record(game.points);
@@ -64,7 +64,8 @@ void draw(){
       frame = (frame + 1) % 7;
     }
   }else{
-    game.nextFrame();             
+    game.nextFrame();
+    if(game.terminal) record(game.points);
   }
   
   // draw game graphics
@@ -106,7 +107,7 @@ void record(int points){
     Collections.sort(pointsHistory);
     int s = pointsHistory.size();
     median = pointsHistory.get(s/2);
-    histogramBuckets = min(pointsHistory.get(s-1), 20); 
+    histogramBuckets = max(1,min(pointsHistory.get(s-1), 20)); 
     int bucketSize = (pointsHistory.get(s-1) - pointsHistory.get(0))/histogramBuckets;
     for(int i = 0; i < s; i++){
       int bucket = min(floor((float) pointsHistory.get(i)/ (float) bucketSize),histogramBuckets-1);
