@@ -36,7 +36,7 @@ void setup(){
   displayLines = 0;
   
   game = new FlappyBird(PhysicsModel.JUMP);
-  agent = new Learner(0.000003f, 0.0025f, 0.95);
+  agent = new Learner(0.000003f, 0.00025f, 0.95);
 }
 
 void draw(){
@@ -61,7 +61,7 @@ void draw(){
         }
 
       if(frame == 0) agent.learn(reward, game.terminal);
-      frame = (frame + 1) % 7;
+      frame = (frame + 1) % 6;
     }
   }else{
     game.nextFrame();

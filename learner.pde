@@ -1,8 +1,7 @@
-import java.util.Arrays;
-import java.util.PriorityQueue;
-
 int DIMENSIONS = 4;
+int ACTIONS = 2;
 int[] BUCKETS = {10,40,40,20};
+double EPS = 0.0000000001; //1E-09
 
 class Learner{
 	// distance to obstacle
@@ -11,11 +10,11 @@ class Learner{
 	// velocity
 	// action
 
-	float[][] minmax = {{10,90},	//best guess
+	float[][] minmax = {{-30,80},	//best guess
 						// {-25,25},
-						{20,50},
-						{-25,25},
-						{-7,7}};
+						{50,100},
+						{-140,200},
+						{-4,8}};
 	float epsilon, deltaEpsilon;
 	float learningRate;
 	float discount;
@@ -26,19 +25,12 @@ class Learner{
 	float[] stateCoords;
 	float[] statePrimeCoords;
 
-	NeuralNet Q, Target;
+	DuelingNet Q, Target;
 
 	ArrayList<Experience> memory = new ArrayList<Experience>();
 	int MAX_MEMORY = 1000000;
 	int MIN_MEMORY = 40000;
-	// Comparator<Experience> experienceCmp = new Comparator<Experience>(){
-	// 		@Override
-	// 		public int compare(Experience a, Experience b){
-	// 			if(a.error - b.error < 0) return 1;		// descending sort
-	// 			if(a.error - b.error > 0) return -1;
- //              	return 0;
-	// 		}
-	// 	};
+
 	int copyFrequency = 1500;
 	int segmentFrequency = 1000;
 
@@ -56,9 +48,16 @@ class Learner{
 		this.learningRate = learningRate;
 		this.discount = discount;
 
-		int[] layers = {DIMENSIONS, 32, 2};
-		Q = new NeuralNet(layers, replayLength, true);
-		Target = new NeuralNet(layers, replayLength, true);
+		int[] actionLayers = {DIMENSIONS, 32, 2};
+		int[] valueLayers = {DIMENSIONS, 32, 1};
+		
+		NeuralNet V = new NeuralNet(valueLayers, replayLength, true);
+		NeuralNet VTarget = new NeuralNet(valueLayers, replayLength, true);
+		NeuralNet A = new NeuralNet(actionLayers, replayLength, true);
+		NeuralNet ATarget = new NeuralNet(actionLayers, replayLength, true);
+
+		Q = new DuelingNet(V,A);
+		Target = new DuelingNet(VTarget,ATarget);
 	}
 
 	void viewWorld(State s){
@@ -106,31 +105,22 @@ class Learner{
 
 	void experienceReplay(){
 		if(memory.size() < MIN_MEMORY) return;
-
 		if(replays%copyFrequency == 0){
 			Target.copy(Q);
-			// println("Copy to Target.");
-		} 
-
-		if(replays%segmentFrequency == 0){
-			calculateSegments();
 		}
+		if(replays%segmentFrequency == 0) calculateSegments();
 
 		int[] replayId = new int[replayLength];
 		Experience[] replay = new Experience[replayLength];
 		double[][] s0Matrix = new double[replayLength][DIMENSIONS];
 		double[][] s1Matrix = new double[replayLength][DIMENSIONS];
 		
-		// boolean print = random(1) < 0.01;
-
 		for(int i = 0; i < replayLength; i++){
-			replayId[i] = sampleSegment(i); // get random experience
+			replayId[i] = sampleSegment(i);
 			Experience e = memory.get(replayId[i]);
 			s0Matrix[i] = e.s0;	
 			s1Matrix[i] = e.s1;	
-			// if(print) print(e.error + " ");
 		}
-		// if(print) println(" . ");
 
 		double[][] maxActionMatrix;
 		double[][] targetMatrix;
@@ -173,9 +163,19 @@ class Learner{
 
 		Q.target(targetMatrix);
 		
-		double error = Q.calculateError();
+		// bias annealing
+		double[][] correction = new double[2][replayLength];
+		double maxWeight = 0;
+		for(int i = 0; i < replayLength; i++){
+			correction[0][i] = correction[1][i] = pow(1f/memory.size() * 1f/probabilityOf(replayId[i]+1),priorityCorrection);
+			maxWeight = max((float)maxWeight, (float)correction[0][i]);
+		}
+		SimpleMatrix correctionMatrix = new SimpleMatrix(correction).scale(1f/maxWeight);
+		
+		double error = Q.calculateError(correctionMatrix);
 		averageError = averageError * replays / (double)(replays + 1) + error / (double)(replays + 1);
 		double[] experienceErrors = Q.errorArray();
+		
 		for(int i = 0; i < replayLength; i++){
 			double previousError = memory.get(replayId[i]).error;
 			memory.get(replayId[i]).setError(experienceErrors[i]);
@@ -187,21 +187,6 @@ class Learner{
 			}
 		}
 
-		// bias annealing
-		double[][] correction = new double[2][replayLength];
-		double maxWeight = 0;
-		for(int i = 0; i < replayLength; i++){
-			correction[0][i] = correction[1][i] = pow(1f/memory.size() * 1f/probabilityOf(replayId[i]+1),priorityCorrection);
-			maxWeight = max((float)maxWeight, (float)correction[0][i]);
-		}
-		
-		SimpleMatrix correctionMatrix = new SimpleMatrix(correction).scale(1f/maxWeight);
-		Q.delta[Q.ctLayers-1] = Q.delta[Q.ctLayers-1].elementMult(correctionMatrix);
-
-		if(priorityCorrection < 1 && priorityCorrection+priorityCorrectionDelta > 1){
-			println("TRANSITED AT " + game.episodes);
-			println("TRANSITED AT " + replays);
-		}
 		priorityCorrection = min(1,priorityCorrection+priorityCorrectionDelta);
 		Q.backPropagate();
 		replays++;
@@ -239,7 +224,7 @@ class Learner{
 		return pow(1f/float(i), priority) / probabilitySum;
 	}
 
-	private double[] getOutputOf(NeuralNet N, float[] inputs){
+	private double[] getOutputOf(DuelingNet N, float[] inputs){
 		double[][] inputMatrix = new double[replayLength][DIMENSIONS];
 		for(int i = 0; i < DIMENSIONS; i++) inputMatrix[0][i] = inputs[i];	
 		N.input(inputMatrix);
@@ -257,7 +242,6 @@ class Learner{
 			if(coord > minmax[i][1]) minmax[i][1] = coord;
 			// normalise coord
 			coord = (coord - minmax[i][0]) / (minmax[i][1] - minmax[i][0]);
-			coord = coord * 2 - 1; // -1 to 1
 			coordinates[i] = coord;
 		}
 		return coordinates;
@@ -281,6 +265,105 @@ class Learner{
 				break;
 			}
 		}
+	}
+}
+
+class DuelingNet {
+	NeuralNet V;
+	NeuralNet A;
+	double[][] outputs;
+	double[][] target;
+	double[] error;
+
+	DuelingNet(NeuralNet V, NeuralNet A){
+		this.V = V;
+		this.A = A;
+	}
+
+	void input(double[][] inputs){
+		V.input(inputs);
+		A.input(inputs);
+	}
+
+	double[][] output(){
+		double[][] value = V.output();
+		double[][] advantage = A.output();
+		outputs = calculateQ(value, advantage);
+		return outputs;
+	}
+
+	void feedForward(){
+		V.feedForward();
+		A.feedForward();
+	}
+
+	void nesterov(){
+		V.nesterov();
+		A.nesterov();
+	}
+
+	void backPropagate(){
+		V.backPropagate();
+		A.backPropagate();
+	}
+
+	void target(double[][] targetMatrix){
+		target = targetMatrix;
+	}
+
+	double calculateError(SimpleMatrix correctionMatrix){
+		SimpleMatrix dCost = new SimpleMatrix(target).minus(new SimpleMatrix(outputs)).negative();
+		SimpleMatrix delta = dCost.transpose().elementMult(correctionMatrix);
+		
+		SimpleMatrix VDelta = new SimpleMatrix(1, delta.numCols());
+		error = new double[delta.numCols()];
+		for(int i = 0; i < delta.numCols(); i++){
+			error[i] = delta.extractVector(false,i).elementSum(); // provide error array for prioritized EP
+			VDelta.set(0,i, error[i]);
+		}
+
+		SimpleMatrix ADelta = delta.copy();
+		
+		for(int i = 0; i < ADelta.numCols(); i++){ // for each training example
+			double dE = ADelta.extractVector(false, i).elementSum();
+			for(int j = 0; j < ADelta.numRows(); j++){ // for each action
+				if(ADelta.get(j,i) < EPS){ // == 0
+					ADelta.set(j,i,(-1f/ACTIONS) * dE);
+				}else{
+					ADelta.set(j,i, (1f-(1f/ACTIONS)) * dE);
+				}
+			}
+		}
+		
+		V.delta[V.ctLayers-1] = VDelta;
+		A.delta[A.ctLayers-1] = ADelta;
+
+		return dCost.elementPower(2).scale(0.5).elementSum();
+	}
+
+	double[] errorArray(){
+		return error;
+	}
+
+	void copy(DuelingNet N){
+		V.copy(N.V);
+		A.copy(N.A);
+	}
+
+	private double[][] calculateQ(double[][] value, double[][] advantage){
+		double[][] Q = new double[value.length][ACTIONS];
+		// Q = V + A - 1/|A|(Ai)
+		for(int i = 0; i < value.length; i++){
+			double mean = 0;
+			for(int j = 0; j < ACTIONS; j++) mean += advantage[i][j];
+			mean /= advantage.length;
+			for(int j = 0; j < ACTIONS; j++){
+				Q[i][j] = value[i][0];
+				Q[i][j] += advantage[i][j];
+				Q[i][j] += mean;
+			}
+		}
+		return Q;
 	}
 }
 
