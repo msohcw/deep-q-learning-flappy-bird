@@ -12,7 +12,8 @@ class Learner{
 
 	float[][] minmax = {{-30,80},	//best guess
 						// {-25,25},
-						{50,100},
+						// {50,100},
+						{-140,200},
 						{-140,200},
 						{-4,8}};
 	float epsilon, deltaEpsilon;
@@ -40,6 +41,9 @@ class Learner{
 	float priorityCorrectionDelta = 0.000003;
 	float probabilitySum = 0;
 
+	double currentValue = 0;
+	double[] currentAdvantage = {0,0};
+
 	int lastAction = 0;
 
 	Learner(float deltaEpsilon, float learningRate, float discount){
@@ -49,12 +53,12 @@ class Learner{
 		this.discount = discount;
 
 		int[] actionLayers = {DIMENSIONS, 32, 2};
-		int[] valueLayers = {DIMENSIONS, 32, 1};
+		int[] valueLayers = {DIMENSIONS, 16, 1};
 		
-		NeuralNet V = new NeuralNet(valueLayers, replayLength, true);
-		NeuralNet VTarget = new NeuralNet(valueLayers, replayLength, true);
-		NeuralNet A = new NeuralNet(actionLayers, replayLength, true);
-		NeuralNet ATarget = new NeuralNet(actionLayers, replayLength, true);
+		NeuralNet V = new NeuralNet(valueLayers, replayLength, learningRate, true);
+		NeuralNet VTarget = new NeuralNet(valueLayers, replayLength, learningRate, true);
+		NeuralNet A = new NeuralNet(actionLayers, replayLength, learningRate, true);
+		NeuralNet ATarget = new NeuralNet(actionLayers, replayLength, learningRate, true);
 
 		Q = new DuelingNet(V,A);
 		Target = new DuelingNet(VTarget,ATarget);
@@ -229,6 +233,11 @@ class Learner{
 		for(int i = 0; i < DIMENSIONS; i++) inputMatrix[0][i] = inputs[i];	
 		N.input(inputMatrix);
 		N.feedForward();
+
+		// Display
+		currentValue = N.V.output()[0][0];
+		currentAdvantage = N.A.output()[0];
+
 		return N.output()[0];
 	}
 
@@ -312,6 +321,7 @@ class DuelingNet {
 	}
 
 	double calculateError(SimpleMatrix correctionMatrix){
+
 		SimpleMatrix dCost = new SimpleMatrix(target).minus(new SimpleMatrix(outputs)).negative();
 		SimpleMatrix delta = dCost.transpose().elementMult(correctionMatrix);
 		
@@ -327,7 +337,7 @@ class DuelingNet {
 		for(int i = 0; i < ADelta.numCols(); i++){ // for each training example
 			double dE = ADelta.extractVector(false, i).elementSum();
 			for(int j = 0; j < ADelta.numRows(); j++){ // for each action
-				if(ADelta.get(j,i) < EPS){ // == 0
+				if(ADelta.get(j,i) == 0){ // == 0
 					ADelta.set(j,i,(-1f/ACTIONS) * dE);
 				}else{
 					ADelta.set(j,i, (1f-(1f/ACTIONS)) * dE);
@@ -338,7 +348,7 @@ class DuelingNet {
 		V.delta[V.ctLayers-1] = VDelta;
 		A.delta[A.ctLayers-1] = ADelta;
 
-		return dCost.elementPower(2).scale(0.5).elementSum();
+		return new SimpleMatrix(target).minus(new SimpleMatrix(outputs)).elementPower(2).scale(0.5).elementSum();
 	}
 
 	double[] errorArray(){
@@ -355,12 +365,15 @@ class DuelingNet {
 		// Q = V + A - 1/|A|(Ai)
 		for(int i = 0; i < value.length; i++){
 			double mean = 0;
+			
 			for(int j = 0; j < ACTIONS; j++) mean += advantage[i][j];
-			mean /= advantage.length;
+			
+			mean /= ACTIONS;
+
 			for(int j = 0; j < ACTIONS; j++){
 				Q[i][j] = value[i][0];
 				Q[i][j] += advantage[i][j];
-				Q[i][j] += mean;
+				Q[i][j] -= mean;
 			}
 		}
 		return Q;

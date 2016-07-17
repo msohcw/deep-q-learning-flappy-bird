@@ -28,7 +28,7 @@ class NeuralNet {
   SimpleMatrix[] delta = new SimpleMatrix[10];
   SimpleMatrix y;
   
-  float initVariance = 0.05;
+  float initVariance = 0.005;
   double learningRate = 0.00003;
   double momentumSize = 0.9;
   double momentDecay = 0.9;
@@ -40,7 +40,7 @@ class NeuralNet {
   int ctLayers = 0;
   int outputIndex;
 
-  NeuralNet(int[] layerSizes, int batchSize, boolean regression){
+  NeuralNet(int[] layerSizes, int batchSize, float learningRate, boolean regression){
     addLayer(layerSizes[0], Layer.INPUT, Activation.RELU);
     for(int i = 1; i < layerSizes.length - 1; i++) addLayer(layerSizes[i], Layer.HIDDEN, Activation.RELU);
     if(regression){
@@ -49,6 +49,7 @@ class NeuralNet {
       addLayer(layerSizes[layerSizes.length - 1], Layer.OUTPUT, Activation.RELU);
     }
     this.batchSize = batchSize;
+    this.learningRate = learningRate;
     connectLayers();
   }
 

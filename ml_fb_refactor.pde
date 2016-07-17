@@ -10,7 +10,7 @@ boolean humanPlayer = false;
 int frameSpeed = 1;
 int frame = 0;
 
-int leftMargin, topMargin, lineHeight, displayLines;
+int leftMargin, topMargin, columnWidth, lineHeight, displayLines;
 
 ArrayList<Integer> pointsHistory = new ArrayList<Integer>();
 int HISTORY_INTERVAL = 3000;
@@ -26,17 +26,18 @@ int runId = round(random(100000));
 boolean recordFrames = false;
 
 void setup(){
-  size(300, 250);
+  size(400, 250);
   stageWidth = 200;
   stageHeight = 250;
 
   leftMargin = stageWidth + 10;
   topMargin = 10;
+  columnWidth = 80;
   lineHeight = 15;
   displayLines = 0;
   
   game = new FlappyBird(PhysicsModel.JUMP);
-  agent = new Learner(0.000003f, 0.00025f, 0.95);
+  agent = new Learner(0.000003f, 0.0001f, 0.95);
 }
 
 void draw(){
@@ -75,15 +76,19 @@ void draw(){
   
   // game statistics
   fill(#EFEFEF);
-  rect(stageWidth,0, 300 - stageWidth,stageHeight);
+  rect(stageWidth,0, 400 - stageWidth,stageHeight);
   
   displayLines = 0;
   display("EPISODES", game.episodes + "");
+  display("REPLAYS", agent.replays + "");
   display("HIGH SCORE", game.highScore + "");
   display("MEDIAN", median + "");
   display("FRAME SPEED", frameSpeed + "");
   display("EPSILON", significant(agent.epsilon, 6) + "");
   display("ERROR",  significant(averageError, 8) + "");
+  display("VALUE",  significant(agent.currentValue, 8) + "");
+  display("FALL",  significant(agent.currentAdvantage[0], 8) + "");
+  display("JUMP",  significant(agent.currentAdvantage[1], 8) + "");
   
   if(drawHistogram){
     fill(#00CC00);
@@ -95,7 +100,7 @@ void draw(){
   for(int i = 0; i < histogramBuckets; i++){
     float height = (float) histogram[i] / (float) histogramMax * (float) histogramHeight;
     float y = (float) histogramHeight - height;
-    rect(leftMargin + i * 4, topMargin + lineHeight * displayLines + y, 3, height);
+    rect(leftMargin + i * 4, topMargin + lineHeight * 12 + y, 3, height);
   }
 
   if (recordFrames) saveFrame("run-"+runId+"-######.tif");
@@ -124,11 +129,11 @@ void display(String title, String value){
   fill(#333333);
   textAlign(LEFT,TOP);
   textSize(9);
-  text(title, leftMargin, topMargin + lineHeight * displayLines);
+  text(title, leftMargin + (floor(displayLines / 12) * columnWidth), topMargin + lineHeight * (displayLines%12));
   displayLines++;
   textAlign(LEFT,CENTER);
   textSize(11);
-  text(value, leftMargin, topMargin + lineHeight * displayLines);
+  text(value, leftMargin + (floor(displayLines / 12) * columnWidth), topMargin + lineHeight * (displayLines%12));
   displayLines++;
 }
 
@@ -141,6 +146,7 @@ void keyReleased() {
   }else{
     if(keyCode == UP) frameSpeed += 1000;
     if(keyCode == DOWN) frameSpeed = 1;
+    if(keyCode == LEFT) frameSpeed = 0;
     if(key == 'r') recordFrames = !recordFrames;
   }
 }
