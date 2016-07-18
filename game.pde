@@ -10,15 +10,16 @@ class FlappyBird {
 	PhysicsModel world;
 	ArrayList<Obstacle> obstacles = new ArrayList<Obstacle>();
 
-	int obstacleGap = 100;
+          int obstacleGap = 100;
   	int obstacleWidth = 20;
 	int obstacleSpeed = 3;
   	
-  	int difficulty = 50; // larger is easier
+          int difficulty = 50;// larger is easier
   	int playerWidth = 12;
   	int playerHeight = 10;
 
-  	int highScore = 0;
+  	int highScore = 1;
+
   	int episodes = 0;
   	int points = 0;
 
@@ -85,7 +86,6 @@ class FlappyBird {
 		State s = new State();
 		Obstacle o = obstacles.get(0);
 		s.setDimension(0, o.topLeft.x - playerWidth); // player distance to obstacle
-		// s.setDimension(1, o.gapHeight); // player distance to lower pipe
 		s.setDimension(1, o.topLeft.y - (position.y + playerHeight/2)); // player distance to lower pipe
 		s.setDimension(2, (position.y - playerHeight/2) - (o.topLeft.y - o.gapHeight)); // player distance to upper pipe
 		s.setDimension(3, velocity.y); // player velocity

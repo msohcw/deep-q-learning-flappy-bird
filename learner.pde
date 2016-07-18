@@ -1,7 +1,7 @@
 int DIMENSIONS = 4;
 int ACTIONS = 2;
 int[] BUCKETS = {10,40,40,20};
-double EPS = 0.0000000001; //1E-09
+double EPS = 0.0001; //1E-09
 
 class Learner{
 	// distance to obstacle
@@ -11,8 +11,6 @@ class Learner{
 	// action
 
 	float[][] minmax = {{-30,80},	//best guess
-						// {-25,25},
-						// {50,100},
 						{-140,200},
 						{-140,200},
 						{-4,8}};
@@ -20,7 +18,7 @@ class Learner{
 	float learningRate;
 	float discount;
 
-  int replayLength = 100;
+  int replayLength = 32;
 	long replays = 0;
 
 	float[] stateCoords;
@@ -32,11 +30,11 @@ class Learner{
 	int MAX_MEMORY = 1000000;
 	int MIN_MEMORY = 40000;
 
-	int copyFrequency = 1500;
+	int copyFrequency = 1000;
 	int segmentFrequency = 1000;
 
 	int[] memorySegments = new int[replayLength];
-	float priority = 0.65;
+	float priority = 0;
 	float priorityCorrection = 0.1;
 	float priorityCorrectionDelta = 0.000003;
 	float probabilitySum = 0;
@@ -46,21 +44,23 @@ class Learner{
 
 	int lastAction = 0;
 
+	NeuralNet V1,A1,VTarget,ATarget;
+
 	Learner(float deltaEpsilon, float learningRate, float discount){
 		epsilon = 1;
 		this.deltaEpsilon = deltaEpsilon;
 		this.learningRate = learningRate;
 		this.discount = discount;
 
-		int[] actionLayers = {DIMENSIONS, 32, 2};
-		int[] valueLayers = {DIMENSIONS, 16, 1};
+          int[] valueLayers = {DIMENSIONS, 32, 1};
+          int[] actionLayers = {DIMENSIONS, 32, 2};
 		
-		NeuralNet V = new NeuralNet(valueLayers, replayLength, learningRate, true);
-		NeuralNet VTarget = new NeuralNet(valueLayers, replayLength, learningRate, true);
-		NeuralNet A = new NeuralNet(actionLayers, replayLength, learningRate, true);
-		NeuralNet ATarget = new NeuralNet(actionLayers, replayLength, learningRate, true);
+		V1 = new NeuralNet(valueLayers, replayLength, learningRate, true);
+		VTarget = new NeuralNet(valueLayers, replayLength, learningRate, true);
+		A1 = new NeuralNet(actionLayers, replayLength, learningRate, true);
+		ATarget = new NeuralNet(actionLayers, replayLength, learningRate, true);
 
-		Q = new DuelingNet(V,A);
+		Q = new DuelingNet(V1,A1);
 		Target = new DuelingNet(VTarget,ATarget);
 	}
 
@@ -79,7 +79,7 @@ class Learner{
 			double[] actions = getOutputOf(Q, stateCoords);
 			choice = (actions[0] > actions[1]) ? 0 : 1;
 		}else{
-			choice = (random(1) > 0.5f) ? 0 : 1;
+                  choice = (random(1) > 0.5f) ? 0 : 1;
 		}
 		
 		lastAction = choice;
@@ -109,9 +109,9 @@ class Learner{
 
 	void experienceReplay(){
 		if(memory.size() < MIN_MEMORY) return;
-		if(replays%copyFrequency == 0){
-			Target.copy(Q);
-		}
+		boolean checkGradient = false; //random(1) < 0.001;
+
+		if(replays%copyFrequency == 0) Target.copy(Q);
 		if(replays%segmentFrequency == 0) calculateSegments();
 
 		int[] replayId = new int[replayLength];
@@ -128,6 +128,7 @@ class Learner{
 
 		double[][] maxActionMatrix;
 		double[][] targetMatrix;
+		double[] tdError = new double[replayLength];
 
 		Q.input(s1Matrix);
 		Q.feedForward();
@@ -163,11 +164,13 @@ class Learner{
 			}
 			
 			targetMatrix[i][1-e.action] = outputMatrix[i][1-e.action];
+			tdError[i] = targetMatrix[i][e.action] - outputMatrix[i][e.action];
 		}
 
 		Q.target(targetMatrix);
 		
 		// bias annealing
+		
 		double[][] correction = new double[2][replayLength];
 		double maxWeight = 0;
 		for(int i = 0; i < replayLength; i++){
@@ -177,14 +180,18 @@ class Learner{
 		SimpleMatrix correctionMatrix = new SimpleMatrix(correction).scale(1f/maxWeight);
 		
 		double error = Q.calculateError(correctionMatrix);
+
+		if(checkGradient) Q.gradientCheck(correctionMatrix);
+
+		// double error = Q.calculateError();
 		averageError = averageError * replays / (double)(replays + 1) + error / (double)(replays + 1);
-		double[] experienceErrors = Q.errorArray();
+		// double[] experienceErrors = Q.errorArray();
 		
 		for(int i = 0; i < replayLength; i++){
 			double previousError = memory.get(replayId[i]).error;
-			memory.get(replayId[i]).setError(experienceErrors[i]);
+			memory.get(replayId[i]).setError(tdError[i]);
 			
-			if(previousError > experienceErrors[i]){
+			if(previousError > tdError[i]){
 				bubbleDown(replayId[i]);
 			}else{
 				bubbleUp(replayId[i]);
@@ -192,7 +199,7 @@ class Learner{
 		}
 
 		priorityCorrection = min(1,priorityCorrection+priorityCorrectionDelta);
-		Q.backPropagate();
+		Q.backPropagate(checkGradient);
 		replays++;
 	}
 
@@ -204,6 +211,7 @@ class Learner{
 	}
 
 	private int sampleSegment(int seg){
+		// return floor(random(0,memory.size()));
 		int s = (seg == 0) ? 0 : memorySegments[seg - 1];
 		int e = (seg == replayLength - 1) ? memory.size() : memorySegments[seg];
 		return min(memory.size() -1, floor(random(s,e))); // #TODO verify behaviour of random(x,y)
@@ -251,6 +259,7 @@ class Learner{
 			if(coord > minmax[i][1]) minmax[i][1] = coord;
 			// normalise coord
 			coord = (coord - minmax[i][0]) / (minmax[i][1] - minmax[i][0]);
+			coord -= 0.5;
 			coordinates[i] = coord;
 		}
 		return coordinates;
@@ -311,9 +320,9 @@ class DuelingNet {
 		A.nesterov();
 	}
 
-	void backPropagate(){
-		V.backPropagate();
-		A.backPropagate();
+	void backPropagate(boolean checkGradients){
+		V.backPropagate(checkGradients);
+		A.backPropagate(checkGradients);
 	}
 
 	void target(double[][] targetMatrix){
@@ -338,9 +347,9 @@ class DuelingNet {
 			double dE = ADelta.extractVector(false, i).elementSum();
 			for(int j = 0; j < ADelta.numRows(); j++){ // for each action
 				if(ADelta.get(j,i) == 0){ // == 0
-					ADelta.set(j,i,(-1f/ACTIONS) * dE);
+					ADelta.set(j,i, -0.5 * dE);
 				}else{
-					ADelta.set(j,i, (1f-(1f/ACTIONS)) * dE);
+					ADelta.set(j,i, 0.5 * dE);
 				}
 			}
 		}
@@ -348,7 +357,7 @@ class DuelingNet {
 		V.delta[V.ctLayers-1] = VDelta;
 		A.delta[A.ctLayers-1] = ADelta;
 
-		return new SimpleMatrix(target).minus(new SimpleMatrix(outputs)).elementPower(2).scale(0.5).elementSum();
+		return dCost.elementPower(2).scale(0.5).elementSum();
 	}
 
 	double[] errorArray(){
@@ -360,8 +369,69 @@ class DuelingNet {
 		A.copy(N.A);
 	}
 
+	void gradientCheck(SimpleMatrix correctionMatrix){
+		double[][] gradient = new double[500][2];
+		int ptr = 0;
+		SimpleMatrix[] vNum = new SimpleMatrix[V.ctLayers];
+		SimpleMatrix[] aNum = new SimpleMatrix[A.ctLayers];
+
+		for(int i = 1; i < V.ctLayers; i++){
+			vNum[i] = new SimpleMatrix(V.W[i].numRows(), V.W[i].numCols());
+			for(int j = 0; j < V.W[i].numRows(); j++){
+				for(int k = 0; k < V.W[i].numCols(); k++){
+					double original = V.W[i].get(j,k);
+					double pos, neg;
+					V.W[i].set(j,k, original - EPS);
+					feedForward();
+					output();
+					neg = calculateError(correctionMatrix);
+					V.W[i].set(j,k, original + EPS);
+					feedForward();
+					output();
+					pos = calculateError(correctionMatrix);
+					V.W[i].set(j,k, original);
+					vNum[i].set(j,k, (pos-neg) / (2f * EPS));
+					ptr++;
+				}
+			}
+		}
+
+		for(int i = 1; i < A.ctLayers; i++){
+			aNum[i] = new SimpleMatrix(A.W[i].numRows(), A.W[i].numCols());
+			for(int j = 0; j < A.W[i].numRows(); j++){
+				for(int k = 0; k < A.W[i].numCols(); k++){
+					double original = A.W[i].get(j,k);
+					double pos, neg;
+					A.W[i].set(j,k, original - EPS);
+					feedForward();
+					output();
+					neg = calculateError(correctionMatrix);
+					A.W[i].set(j,k, original + EPS);
+					feedForward();
+					output();
+					pos = calculateError(correctionMatrix);
+					A.W[i].set(j,k, original);
+					aNum[i].set(j,k, (pos-neg) / (2f * EPS));
+					ptr++;
+				}
+			}
+		}
+		
+		feedForward();
+		output();
+
+		double totalGradient = 0;
+		println("NUMERICAL");
+		println("VALUE");
+		for(int i = 1; i < V.ctLayers; i++) println(vNum[i]);
+		println("ADVANTAGE");
+		for(int i = 1; i < A.ctLayers; i++) println(aNum[i]);
+	}
+
 	private double[][] calculateQ(double[][] value, double[][] advantage){
 		double[][] Q = new double[value.length][ACTIONS];
+
+
 		// Q = V + A - 1/|A|(Ai)
 		for(int i = 0; i < value.length; i++){
 			double mean = 0;

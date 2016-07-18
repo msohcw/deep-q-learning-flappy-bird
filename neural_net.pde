@@ -28,7 +28,7 @@ class NeuralNet {
   SimpleMatrix[] delta = new SimpleMatrix[10];
   SimpleMatrix y;
   
-  float initVariance = 0.005;
+  float initVariance = 0.0005;
   double learningRate = 0.00003;
   double momentumSize = 0.9;
   double momentDecay = 0.9;
@@ -133,7 +133,7 @@ class NeuralNet {
     }
   }
 
-  void backPropagate(){
+  void backPropagate(boolean checkGradients){
     for(int i = ctLayers - 2 ; i > 0; i--){
       if(A[i] == Activation.RELU){
         delta[i] = W[i+1].transpose().mult(delta[i+1]); // dNet(i+1)/dOut(i) * dE/dOut(i+1)
@@ -143,6 +143,7 @@ class NeuralNet {
     }
     
     for(int i = ctLayers - 1 ; i > 0; i--){
+      if(checkGradients) println(delta[i].mult(a[i-1].transpose()));
       delta[i] = delta[i].divide(batchSize).scale(learningRate).elementMult(g[i].plus(1,epsilon[i]).elementPower(-0.5)); // learningRate/sqrt(g + epsilon)
       W[i] = W[i].minus(delta[i].mult(a[i-1].transpose()).plus(momentum[i].scale(momentumSize)));
       momentum[i] = delta[i].mult(a[i-1].transpose()).plus(momentum[i].scale(momentumSize));
