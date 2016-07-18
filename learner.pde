@@ -34,7 +34,7 @@ class Learner{
 	int segmentFrequency = 1000;
 
 	int[] memorySegments = new int[replayLength];
-	float priority = 0;
+	float priority = 0.65;
 	float priorityCorrection = 0.1;
 	float priorityCorrectionDelta = 0.000003;
 	float probabilitySum = 0;
