@@ -152,7 +152,7 @@ class NeuralNet {
   }
 
   void copy(NeuralNet other){
-    for(int i = 1; i < ctLayers; i++) W[i] = other.W[i];
+    for(int i = 1; i < ctLayers; i++) W[i] = other.W[i].copy();
   }
 }
 

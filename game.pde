@@ -3,7 +3,7 @@ enum PhysicsModel{
 }
 
 enum Action{
-	UP, DOWN
+	UP, DOWN, NO_OP
 }
 
 class FlappyBird {

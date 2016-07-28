@@ -38,7 +38,7 @@ void setup(){
   displayLines = 0;
   
   game = new FlappyBird(PhysicsModel.JUMP);
-  agent = new Learner(0.000001f, 0.000001f, 0.95);
+  agent = new Learner(0.000001f, 0.0000005f, 0.95);
 }
 
 void draw(){
@@ -50,6 +50,7 @@ void draw(){
         game.takeAction(agent.act());
       }else{
         game.takeAction(Action.DOWN);
+        //agent.lastAction = 0;
       }
 
       game.nextFrame(); 
@@ -63,7 +64,8 @@ void draw(){
         }
 
       if(frame == 0) agent.learn(reward, game.terminal);
-      frame = (frame + 1) % 6;
+      if(frame == 0) agent.experienceReplay();
+      frame = (frame + 1) % 7;
     }
   }else{
     game.nextFrame();
@@ -88,6 +90,8 @@ void draw(){
   display("FRAME SPEED", frameSpeed + "");
   display("EPSILON", significant(agent.epsilon, 6) + "");
   display("ERROR",  significant(averageError, 8) + "");
+  display("VALUE",  significant(agent.currentValue, 8) + "");
+  for(int i = 0; i < ACTIONS; i++) display("ACTION " + (i+1),  significant(agent.currentAdvantage[i], 8) + "");
   
   if(drawHistogram){
     fill(#00CC00);

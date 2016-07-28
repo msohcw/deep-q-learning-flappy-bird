@@ -30,12 +30,12 @@ class Learner{
   int MAX_MEMORY = 1000000;
   int MIN_MEMORY = 40000;
 
-  int copyFrequency = 1000;
+  int copyFrequency = 2000;
   int segmentFrequency = 1000;
 
   int[] memorySegments = new int[replayLength];
-  float priority = 0.65;
-  float priorityCorrection = 0.1;
+  float priority = 0.4;
+  float priorityCorrection = 0.4;
   float priorityCorrectionDelta = 0.000003;
   float probabilitySum = 0;
 
@@ -53,7 +53,7 @@ class Learner{
     this.discount = discount;
 
     int[] valueLayers = {DIMENSIONS, 32, 1};
-    int[] actionLayers = {DIMENSIONS, 32, ACTIONS};
+    int[] actionLayers = {DIMENSIONS, 64, 64, 64, ACTIONS};
     
     V1 = new NeuralNet(valueLayers, replayLength, learningRate, true);
     VTarget = new NeuralNet(valueLayers, replayLength, learningRate, true);
@@ -86,6 +86,7 @@ class Learner{
     }
     
     lastAction = choice;
+    if(memory.size() >= MIN_MEMORY) epsilon = max(0, epsilon - deltaEpsilon);   
 
     if(choice == 0){
       return Action.DOWN;
@@ -94,6 +95,7 @@ class Learner{
     }else{
       return Action.NO_OP;
     }
+    
   }
 
   void learn(float reward, boolean terminal){
@@ -105,11 +107,10 @@ class Learner{
       s1[i] = statePrimeCoords[i];
     }
     addExperience(s0, s1, lastAction, reward, terminal);
-    if(game.episodes % 2 == 0) experienceReplay();
+    // if(game.episodes % 10 == 0) experienceReplay();
     // prepare to act based on new state
     stateCoords = statePrimeCoords;
     // lower exploration rate
-    if(memory.size() >= MIN_MEMORY) epsilon = max(0, epsilon - deltaEpsilon);   
   }
 
   void experienceReplay(){
@@ -158,7 +159,7 @@ class Learner{
       
       // select the maximising action
       int maximisingAction = 0;
-      for(int j = 1; j < ACTIONS; j++) if(maxActionMatrix[j] > maxActionMatrix[maximisingAction]) maximisingAction = j; 
+      for(int j = 1; j < ACTIONS; j++) if(maxActionMatrix[i][j] > maxActionMatrix[i][maximisingAction]) maximisingAction = j; 
       // if(maxActionMatrix[i][1] > maxActionMatrix[i][0]) maximisingAction = 1;
 
       double maxFutureReward = targetMatrix[i][maximisingAction];
@@ -175,7 +176,7 @@ class Learner{
       } 
       
       // targetMatrix[i][1-e.action] = outputMatrix[i][1-e.action];
-      tdError[i] = targetMatrix[i][e.action] - outputMatrix[i][e.action];
+      tdError[i] = abs((float)(targetMatrix[i][e.action] - outputMatrix[i][e.action]));
     }
 
     Q.target(targetMatrix);
@@ -217,7 +218,7 @@ class Learner{
 
   void addExperience(double[] s0, double[] s1, int action, float reward, boolean terminal){
     Experience e = new Experience(s0,s1,action,reward,terminal);
-    if(memory.size() > MAX_MEMORY) memory.remove(0);
+    if(memory.size() > MAX_MEMORY) memory.remove(memory.size()-1);
     memory.add(e);
     bubbleUp(memory.size()-1); 
   }
@@ -271,7 +272,7 @@ class Learner{
       if(coord > minmax[i][1]) minmax[i][1] = coord;
       // normalise coord
       coord = (coord - minmax[i][0]) / (minmax[i][1] - minmax[i][0]);
-      coord -= 0.5;
+      coord = 2 * coord - 1;
       coordinates[i] = coord;
     }
     return coordinates;
@@ -302,8 +303,8 @@ class DuelingNet {
   NeuralNet V;
   NeuralNet A;
   double[][] outputs;
-  double[][] target;
-  double[] error;
+  double[][] targets;
+  // double[] error;
 
   DuelingNet(NeuralNet V, NeuralNet A){
     this.V = V;
@@ -311,8 +312,8 @@ class DuelingNet {
   }
 
   void input(double[][] inputs){
-    V.input(inputs);
     A.input(inputs);
+    V.input(inputs);
   }
 
   double[][] output(){
@@ -323,36 +324,30 @@ class DuelingNet {
   }
 
   void feedForward(){
-    V.feedForward();
     A.feedForward();
+    V.feedForward();
   }
 
   void nesterov(){
-    V.nesterov();
     A.nesterov();
+    V.nesterov();
   }
 
   void backPropagate(boolean checkGradients){
-    V.backPropagate(checkGradients);
     A.backPropagate(checkGradients);
+    V.backPropagate(checkGradients);
   }
 
   void target(double[][] targetMatrix){
-    target = targetMatrix;
+    targets = targetMatrix;
   }
 
   double calculateError(SimpleMatrix correctionMatrix){
 
-    SimpleMatrix dCost = new SimpleMatrix(target).minus(new SimpleMatrix(outputs)).negative();
+    SimpleMatrix dCost = new SimpleMatrix(targets).minus(new SimpleMatrix(outputs)).negative();
     SimpleMatrix delta = dCost.transpose().elementMult(correctionMatrix);
     
     SimpleMatrix VDelta = new SimpleMatrix(1, delta.numCols());
-    error = new double[delta.numCols()];
-    for(int i = 0; i < delta.numCols(); i++){
-      error[i] = delta.extractVector(false,i).elementSum(); // provide error array for prioritized EP
-      VDelta.set(0,i, error[i]);
-    }
-
     SimpleMatrix ADelta = delta.copy();
     
     for(int i = 0; i < ADelta.numCols(); i++){ // for each training example
@@ -365,9 +360,11 @@ class DuelingNet {
         }
       }
     }
+
+    for(int i = 0; i < delta.numCols(); i++) VDelta.set(0, i, delta.extractVector(false,i).elementSum());
     
-    V.delta[V.ctLayers-1] = VDelta;
-    A.delta[A.ctLayers-1] = ADelta;
+    V.delta[V.ctLayers-1] = VDelta.copy();
+    A.delta[A.ctLayers-1] = ADelta.copy();
 
     return dCost.elementPower(2).scale(0.5).elementSum();
   }
