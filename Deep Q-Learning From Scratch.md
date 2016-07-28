@@ -4,6 +4,8 @@
 
 ### Introduction
 
+*DISCLAIMER: This was written by a CS freshman about his experiences implementing the DeepMind research papers. I am not a machine learning expert. Some things may be subtly incorrect or completely wrong. (Please let me know if I've made such a mistake.)*
+
 ### Reinforcement Learning
 
 ### The Environment
@@ -13,7 +15,7 @@ The game we will try to learn will be a [Processing][processing] clone of Flappy
 It's an ideal toy environment for several reasons 
 
 * Limited action space, *Jump* and *Don't Jump*
-* Continuous reward feedback, *+1* for each pipe passed, makes the credit assignment problem less significant
+* Continuous reward feedback, $+1$ for each pipe passed, making the credit assignment problem less significant
 * Limited world state, namely the incoming pipes, and the player's own state
 
 The last point is important because we will **not** be implementing a key section of the DeepMind Atari work, namely using ConvNets (Convolutional Neural Networks) to learn features of the game to be fed into the Q-Network. Rather, we will engineer features to feed it, so that we can focus on how the Q-Learning section works.
@@ -179,7 +181,7 @@ And that's it! The full code for this stage is available [here][stage_2]. You sh
 
 In the tabular version we used a lookup table as the Q function. But there's some significant downsides to this solution.
 
-*     There's limited generalisability. That is if we have a new state $y$ that differs from seen state $x$ by some small distance e.g. 1 indice, the agent doesn't learn from $x$ at all. That is, it doesn't generalise well to previously unseen states.
+*     There's limited generalisability. That is if we have a new state $y$ that differs from seen state $x$ by some small distance e.g. 1 indice, the agent doesn't learn from $x$ at all. That is, it doesn't generalize well to previously unseen states.
 
 *     The limiting factor is memory. A lookup table for a state like the Atari 2600 pixel frame would be impossibly large to store.
 
@@ -241,7 +243,7 @@ double[] actions = getOutputOf(Q, stateCoords);
 
 private double[] getOutputOf(NeuralNet N, float[] inputs){
   // these lines transform the input into a minibatch matrix with 0s everywhere
-  // except at the i = 0, the inputs
+  // except at i = 0, the inputs
   double[][] inputMatrix = new double[replayLength][DIMENSIONS];
   for(int i = 0; i < DIMENSIONS; i++) inputMatrix[0][i] = inputs[i];	
   
@@ -285,6 +287,82 @@ void addExperience(double[] s0, double[] s1, int action, float reward, boolean t
 
  The bulk of the work is done in the ```experienceReplay``` function
 
+```java
+void experienceReplay(){
+   // the agent first collects MIN_MEMORY experiences using a uniform exploration policy
+  if(memory.size() < MIN_MEMORY) return;
+  
+  int[] replayId = new int[replayLength];
+  double[][] s0Matrix = new double[replayLength][DIMENSIONS];
+  double[][] s1Matrix = new double[replayLength][DIMENSIONS];
+
+  for(int i = 0; i < replayLength; i++){
+    replayId[i] = floor(random(memory.size())); 	// pick random experience
+    Experience e = memory.get(replayId[i]);
+    s0Matrix[i] = e.s0;								// store s0 into matrix	
+    s1Matrix[i] = e.s1;								// and s1 into matrix
+  }
+
+  // find maxFutureReward using s1 matrix
+  double[][] targetMatrix;
+  if(memory.size() < MIN_MEMORY + TARGET_WAIT){ // collect an additional TARGET_WAIT
+    Q.input(s1Matrix);							// experiences and replays before 
+    Q.feedForward();							// using TargetNet, i.e. initialise 
+    targetMatrix = Q.output();					// TargetNet not randomly, but with 													// weights trained over TARGET_WAIT
+  }else{
+    Target.input(s1Matrix);						// otherwise, feedForward s1
+    Target.feedForward();
+    targetMatrix = Target.output();				// and store the output
+  }
+  
+  // feedforward s0 to obtain outputs
+  // error between target and output will be used to backpropagate
+  Q.input(s0Matrix);
+  Q.nesterov(); // this applies nesterov momentum correction to the neural net
+  Q.feedForward();	
+
+  double[][] outputMatrix = Q.output();
+
+  // at this point, the targetMatrix and outputMatrix have been filled
+  
+  for(int i = 0; i < replayLength; i++){
+    Experience e = memory.get(replayId[i]);
+    // find the maxFutureReward based on max(targetMatrix[i]) 
+    double maxFutureReward = (targetMatrix[i][0] > targetMatrix[i][1])? targetMatrix[i][0] : targetMatrix[i][1];
+    // calculate the actual targets
+    if(e.terminal){ // if terminal, maxFutureReward = 0
+      targetMatrix[i][e.action] = (double) e.reward; 
+    }else{
+      targetMatrix[i][e.action] = (double) e.reward + discount * maxFutureReward; 
+    }
+    // for the unselected action, set the target to what it output, 
+    // i.e. the error for the unselected action should be 0
+    targetMatrix[i][1-e.action] = outputMatrix[i][1-e.action];
+  }
+
+  Q.target(targetMatrix);
+  double error = Q.calculateError();
+  averageError = averageError * (double) replays / ((double) replays + 1) + error / ((double) replays + 1);
+  Q.backPropagate(); // after calculating error, backpropagate
+
+  // copy the weights from Q to Target every TARGET_WAIT replays
+  if(replays % TARGET_WAIT == 0) Target.copy(Q);
+  replays++;
+```
+
+It should take approximately 100,000 - 200,000 episodes for the agent to train. You'll quickly realise that this is *very, very* much slower compared to the tabular Q-learner. The tabular Q-learner makes each update and action choice with constant time $\Theta(1)$, whereas the DQL learner has to do experience replay (proportional to net size and ```REPLAY_LENGTH```), and evaluate the Q-net (proportional to net size). 
+
+*Additionally, I couldn't get OpenCL working with processing, so the system isn't parallelised or taking advantage of any GPU. In a real system, (with a lot larger nets and more data), the matrix multiplications would be performed far more efficiently on an array of GPUs.*
+
+To speed it up, we can alter several variables,
+
+* Let the agent only act every $k$ frames, and ```fall()``` for the rest. This significantly boosts training speed. In the DQL paper, they propose a similar speedup, except the action is repeated, i.e. the same action is applied for all $k$ frames. In effect, this simulates some measure of human reaction time.
+* Carry out ```experienceReplay()``` only every $n$ frames, because experience replay is costly. This allows the agent to collect more experiences overall in the same amount of time.
+
+The completed code for this stage is [here][stage3].
+
+However, even after a long period, the agent might not converge to a good policy, when compared with the tabular Q-learner. Time to bring in some additional help.
+
 ### Double Q-Learning and Double DQN
 
 If we expand the Q-learning equation, the equation for calculating targets/updates looks like this:
@@ -295,7 +373,9 @@ $ = r + discount \times max[Q(s', a)] $
 
 $= r + discount \times max[r + discount \times max[Q(s'', a)]]$
 
-Over time, the max operator tends to cause an overestimation of how good any given state is.
+$= r + discount \times max[r + discount \times max[r+discount\times max[r+discount\times ...]]]$
+
+The max operator tends to cause an overestimation of how good any given state is, as it accumulates any positive noise in the Q-value estimation. Over time, that accumulation can cause the system to become incredibly inaccurate, or diverge.
 
 To improve upon this, an original innovation in Q-Learning, Double Q-Learning, was to have two lookup tables and randomly assign experiences to each lookup table. Then, instead of using the same lookup table for calculating updates, we use one two pick the best future action and one to calculate the value of that action.
 
@@ -303,7 +383,45 @@ $maxFutureReward = r + discount \times max[Q_1( s', max_a Q_2(s', a) )]$
 
 We can apply this in Deep Q-Learning by using two nets. But, we already have two nets, the Q net and the Target net, hurrah! With Double DQN, we use the Q net to pick the best action, and the Target net to estimate the value of that action.
 
-**code**
+Thankfully, the modifications to achieve this are rather simple. We just need to alter the code that calculates the targets we use in backpropagation during `experience_replay()`
+
+```java
+
+double[][] maxActionMatrix;	// this matrix will store the output of Q
+double[][] targetMatrix;	// this matrix will store the output of Target
+
+Q.input(s1Matrix);			// feed in s1 into Q to determine maxAction
+Q.feedForward();
+maxActionMatrix = Q.output();
+
+if(memory.size() < MIN_MEMORY + 2000){
+  targetMatrix = maxActionMatrix;
+}else{
+  Target.input(s1Matrix);			// feed in s1 into Target to determine actual value
+  Target.feedForward();
+  targetMatrix = Target.output();
+}
+
+// ... lines omitted for brevity
+
+for(int i = 0; i < replayLength; i++){
+  Experience e = memory.get(replayId[i]);
+  // select the maximising action
+  int maximisingAction = 0;
+  if(maxActionMatrix[i][1] > maxActionMatrix[i][0]) maximisingAction = 1;
+  // maxFutureReward is now the value the maximisingAction in targetMatrix
+  double maxFutureReward = targetMatrix[i][maximisingAction];
+
+// for comparison, the old version looked like this
+// double maxFutureReward = 
+// (targetMatrix[i][0] > targetMatrix[i][1]) ? targetMatrix[i][0] : targetMatrix[i][1];
+  
+// ... lines omitted for brevity
+```
+
+The remainder of `experience_replay()` is exactly the same. The completed code for this stage is [here](undefined).
+
+Empirically, I found that this agent converges to a better policy, and converges to it faster than the vanilla DQL agent. However, faster is relative and it's still pretty slow. We'll try to improve training speed in the next addition.
 
 ### Prioritized Experience Replay
 
@@ -315,13 +433,165 @@ $TD\ Error = |Q(s,a) - (r + maxQ(s',a))|$
 
 Intuitively, this is a measure of how 'surprising' any given transition is. For example, the transition from $0$ reward to $1$ reward when passing a pipe would have a high $TD\ Error$ and should be replayed more often. Similarly with the transition when hitting a pipe and a $-1$  penalty results.
 
-### Proportional Prioritization and Rank-based Prioritization
+#### Proportional Prioritization and Rank-based Prioritization
 
 Now that we have a measure of how important any experience is, we might want to greedily replay only the set of experiences with the highest $TD\ Error$. But the obvious problem with that is that initially low $TD\ Error$ experiences may *never* be replayed. Additionally, it may cause the neural net to overfit and be weaker in the long run. (You might be noticing a trend here, in that we always have to be careful not to push the system one way or the other.) The proposed solution is a **stochastic prioritization**, with either 
 
 * proportional prioritization, based on $TD\ Error_i$
 * rank based prioritization, based on rank of $TD\ Error_i$ when sorted across the memory
 
-$$P(i) = \frac{p_i^a}{\sum_{k} p_k^a}, p_i = |TD\ Error_i|$$ if proportional, $$p_i = \frac{1}{rank(TD\ Error_i)}$$ if rank based.
+$$P(i) = \frac{p_i^a}{\sum_{k} p_k^a}$$, if proportional : $$p_i = |TD\ Error_i|$$  if rank based: $$p_i = \frac{1}{rank(|TD\ Error_i|)}$$ 
 
-$a$ is a priority factor, where $a=0$  is no prioritization, i.e. drawing from a uniform distribution.
+$a$ is a priority factor, where $a=0$  is no prioritization, i.e. drawing from a uniform distribution. (When $a=0$, $p_i^a = 1$ for all $i$, hence the uniform distribution). By manipulating $a$ we can control how much the agent prioritizes experiences, and prevent the problem with overfitting to high $TD\ Error$ experiences.
+
+Comparing between proportional and rank-based prioritization, theoretically rank-based prioritization should be better, because it isn't affected by outliers in $TD\ Error$. (Empirically, the paper found that there were differences, but they weren't significant.)  We'll be implementing rank-based prioritization.
+
+#### Sorting experiences
+
+It would be very computationally costly to keep sorting the list of experiences by constantly fluctuating $TD\ Error$ . The paper proposes an innovative compromise for rank-based prioritization by using a [binary max heap structure][binary heap wiki] in an unorthodox manner.
+
+Examining a binary max heap, the underlying data structure (an ArrayList in our case), is *nearly-sorted*. That is, due to the nature of the heap structure, each sub-tree is a sorted heap. This means that each element $i$ is at larger than at least $k$ elements after it, where $k$ is the size of $i$'s subtree.
+
+Well that was confusing. It's easier to see visually.
+
+For a tree like this:
+
+
+
+The underlying array is *nearly-sorted*
+
+10, 8, 5, 6, 4, 3, 2, 2, 1
+
+For our purposes this will do because we're only picking prioritized experiences and we don't need the guarantee of a perfectly sorted list. This allows us to insert experiences and modify $TD\ Error$ in $\Theta(logN)$ time, which is far better than sorting after every experience replay in $\Theta(NlogN)$ time.
+
+*To do this, I implemented a `bubbleUp()` and `bubbleDown()` function to update the heap. The implementation of these functions are not shown.*
+
+We modify `addExperience()` to perform this.
+
+```java
+void addExperience(double[] s0, double[] s1, int action, float reward, boolean terminal{
+  Experience e = new Experience(s0,s1,action,reward,terminal);
+  // instead of removing the 0th, i.e. the oldest memory, we remove the last,
+  // the memory with the nearly-lowest TD-error
+  if(memory.size() > MAX_MEMORY) memory.remove(memory.size()-1);
+  memory.add(e);
+  // bubbleUp swaps the memory with its parent in the tree until its parent has a larger TD error, maintaining the binary max heap
+  bubbleUp(memory.size()-1); 
+}
+```
+
+We also need to modify `experienceReplay()` to store the $TD\ Errors$ and update them.
+
+```java
+// in experienceReplay()
+for(int i = 0; i < replayLength; i++){
+  // in the experience replay loop
+  // ...
+  // TDError = |target - out|
+  //		 = |(e.reward + discount * maxFutureReward) - out|
+  double TDError = abs((float)(targetMatrix[i][e.action] - outputMatrix[i][e.action]));
+ 
+  // update
+  double previousError = memory.get(replayId[i]).error;
+  memory.get(replayId[i]).setError(TDError); // set the new error
+  if(previousError > TDError){
+    bubbleDown(replayId[i]); // bubble down since TDError is now smaller
+  }else{
+    bubbleUp(replayId[i]);   // bubble up since TDError is now bigger
+  }
+}
+```
+
+
+
+#### Stratified Sampling
+
+We'll further improve on this technique with [stratified sampling][stratified sampling wiki]. Stratified sampling involves selecting items across different strata of the population to obtain a representative sample. In our case the strata will be equal segments of $p_i = \frac{1}{rank(|TD\ Error_i|)}$, and we'll have the same number of strata as our `REPLAY_LENGTH`, so each experience in the replay will be in a different $TD\ Error$ range, allowing us to prevent catastrophic forgetting of low $TD\ Error$ experiences but also learning more often from high $TD\ Error$ experiences.
+
+We'll implement this with a `calculateSegments()` function.
+
+```java
+private float probabilityOf(int i){
+  // this lets us find P(i) = p_i/sum(p_k),
+	return pow(1f/float(i), priority) / probabilitySum;
+}
+
+private void calculateSegments(){
+  // update the value of probabilitySum, so that we correctly calculate P(i)
+  probabilitySum = 0;
+  for(int i = 1; i <= memory.size(); i++)
+    probabilitySum += pow(1f/float(i), priority);
+
+  int segments = 0;
+  float cumulative = 0;
+  for(int i = 1; i <= memory.size(); i++){ 	// be careful to start with i = 1
+    cumulative += probabilityOf(i);	
+    // 0 <= cumulative <= 1, because we add P(i), and not p_i
+    
+    // when the total so far is bigger than its segment,
+    // i.e. if replayLength = 10, segments = 2, cumulative = 0.31,
+    // then store the current experience as the 'break point' for this segment
+    
+    if(cumulative > (segments + 1) / (float) replayLength){
+      // memorySegments[i] stores first index of segment(i+1)
+      memorySegments[segments] = i; 
+      segments++; // move on to next segment
+    }
+  }
+}
+```
+We then uniformly sample from each segment to fill in each experience in the replay, and this approximates selecting each experience with $P(i)$.
+
+```java
+private int sampleSegment(int seg){
+  // start at 0 if first segment 
+  int s = (seg == 0) ? 0 : memorySegments[seg - 1];
+  // end at last experience in memory if last segment
+  int e = (seg == replayLength - 1) ? memory.size() : memorySegments[seg];
+  // uniformly sample between s and e
+  return min(memory.size() -1, floor(random(s,e))); 
+}
+
+// ... in experienceReplay() we alter the line 
+// 	replayId[i] = floor(random(memory.size())); 
+// to
+replayId[i] = sampleSegment(i);
+
+```
+
+#### Bias Annealing
+
+Well that was a long section. But we're not done yet! :(
+
+When using a neural net, one of the assumptions we make is about distribution of training examples. Remember when we introduced experience replay, the purpose was to prevent catastrophic forgetting and to smoothen out the distribution. *But*, by prioritizing experiences, we've introduced a new source of bias into the system, that we have to correct for. 
+
+Intuitively, we can think of this bias as affecting the gradient as we converge towards a solution. High $TD\ Error$ experiences are likely to result in larger gradients (more learning), and likely to be played more often. Frequent updates of large gradients create a lot of instability in the neural net, especially when it's converging towards a solution and needs to 'slow down'. Hence, we want to gradually anneal the bias (at the start the bias has little effect because the policy is still changing and there's a lot of noise in state and targets) as we are converging to the solution.
+
+This is done with Importance-Sampling (IS) weights.
+
+$$w_i = (\frac{1}{N}\times\frac{1}{P(i)})^\beta$$, $$\delta_i=w_i\delta_i$$
+
+A new term $\beta$ is introduced, as the priority correction factor. We anneal $\beta$ from $0$ to $1$ such that at $1$ the bias is fully compensated for. Then we multiply the gradient $\delta_i$ by $w_i$ as compensation.
+
+The equation above makes intuitive sense if we examine it. In an unprioritised system, we selected each experience with probability $\frac{1}{N}$. In the prioritised system we select each experience with probability $P(i)$. We divide by $P(i)$ and multiply by $\frac{1}{N}$ so that $w_i$ effectively 'undoes' the bias when it modifies the magnitude of the gradient. This way, high $TD\ Error$ experiences are still replayed many times, but the gradient of each is made small enough so that it can converge to a solution.
+
+We continue to modify `experienceReplay()` to do this.
+
+```java
+// ... in experienceReplay()
+double[][] correction = new double[2][replayLength];
+double maxWeight = 0;
+for(int i = 0; i < replayLength; i++){
+  // calculate w_i
+  correction[0][i] = correction[1][i] = 
+    pow(1f/memory.size() * 1f/probabilityOf(replayId[i]+1),priorityCorrection);
+  // find max(w_i)
+  maxWeight = max((float)maxWeight, (float)correction[0][i]);
+}
+// create a correctionMatrix of w_i, normalised by 1/max(w_i)
+// normalisation prevents delta from exploding, as it guarantees the correction
+// will be <= 1 and increases the overall stability.
+SimpleMatrix correctionMatrix = new SimpleMatrix(correction).scale(1f/maxWeight);
+// multiply delta_i by the correctionMatrix
+Q.delta[Q.ctLayers-1] = Q.delta[Q.ctLayers-1].elementMult(correctionMatrix);
+```
